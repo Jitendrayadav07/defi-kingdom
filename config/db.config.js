@@ -52,7 +52,5 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
-//All Model File Import 
-db.roles = require("../models/role")(sequelize,Sequelize);
 
 module.exports = db;
