@@ -7,6 +7,17 @@ const { Op, QueryTypes } = require("sequelize");
 const USER_CONSTANTS = require("../constants/userConstants");
 const sendForgetEmail = require("../utils/sendForgetEmail");
 const sendEmail = require("../utils/sendEmail");
+const { ethers } = require("ethers");
+require("dotenv").config();
+
+// Function to create a new wallet
+async function generateWallet() {
+  const wallet = ethers.Wallet.createRandom(); // No need for await here as it's synchronous
+  return {
+    address: wallet.address,
+    privateKey: wallet.privateKey,
+  };
+}
 
 const registerUser = async (req, res) => {
   try {
@@ -16,6 +27,11 @@ const registerUser = async (req, res) => {
       return res.status(400).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_ALREADY_EXISTS, 400));
 
     req.body.password = await bcrypt.hash(req.body.password, 10);
+
+    let wallet_create = await generateWallet();
+
+    req.body.wallet_address = wallet_create.address;
+    req.body.wallet_private_key = wallet_create.privateKey;
 
     let user = await db.users.create(req.body);
 
@@ -49,6 +65,7 @@ const userSignIn = async (req, res) => {
       return res.status(404).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID, 404));
 
     delete user_data.dataValues.password;
+    delete user_data.dataValues.wallet_private_key;
     // JWT Token creation
     const token = jwt.sign(
       { email: user_data.email },

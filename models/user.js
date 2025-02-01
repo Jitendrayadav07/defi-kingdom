@@ -17,6 +17,12 @@ module.exports = (sequelize, Sequelize) => {
         },
         password: {
             type: Sequelize.STRING
+        },
+        wallet_address: {
+            type: Sequelize.STRING
+        },
+        wallet_private_key: {
+            type: Sequelize.TEXT
         }
     }, {
         freezeTableName: true,
@@ -24,4 +30,4 @@ module.exports = (sequelize, Sequelize) => {
         underscored: true,
     })
     return User;
-  }
+}
