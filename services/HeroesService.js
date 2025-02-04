@@ -1,5 +1,4 @@
 const GraphQLService = require("./graphQLService.js");
-const HEROES_CONSTANTS_STATUS = require("../constants/heroesConstants");
 
 class HeroesService {
     async getHeroesByOwner(ownerAddress) {

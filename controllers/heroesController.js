@@ -1,6 +1,7 @@
 const Response = require("../classes/Response");
 const HEROES_CONSTANTS_STATUS = require("../constants/heroesConstants");
 const HeroesService = require("../services/HeroesService");
+const axios = require('axios');
 
 const getOwnerHeroesByAddress = async (req, res) => {
     try {
@@ -14,7 +15,23 @@ const getOwnerHeroesByAddress = async (req, res) => {
             return res.status(404).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
 
-        return res.status(200).send(Response.sendResponse(true, data.heroes, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
+        const heroesWithSkeletons = [];
+        
+        for (let i = 0; i < data.heroes.length; i++) {
+            const hero = data.heroes[i];
+            const heroId = hero.id;
+            const url = `https://game.defikingdoms.com/assets/rigs/hero-rig/skeleton.json?heroId=${heroId}`;
+            
+            try {
+                const response = await axios.get(url);
+                hero.skeleton = response.data;  //
+            } catch (error) {
+                hero.skeleton = null;  
+                console.error(`Failed to fetch skeleton for heroId: ${heroId}`, error);
+            }
+            heroesWithSkeletons.push(hero);
+        }
+        return res.status(200).send(Response.sendResponse(true, heroesWithSkeletons, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
     } catch (error) {
         return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
     }
