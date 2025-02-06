@@ -16,7 +16,6 @@ const userSchema = {
     registerUser: Joi.object().keys({ 
         name: Joi.string(),
         email: Joi.string().required(),
-        phone: Joi.string(),
         password: Joi.string().required().custom((value, helpers) => {
             const validationResult = passwordComplexity.validate(value);
             if (validationResult.error) {
