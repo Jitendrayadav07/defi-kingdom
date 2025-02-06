@@ -7,11 +7,13 @@ const walletProfileRoutes = require("./walletProfile");
 const heroesRoutes = require("./heroes");
 const userRoutes = require("./user");
 const tokenRoutes = require("./token");
+const googleSuccess = require("./google_auth")
 
 // Register route handlers
 router.use("/profile", walletProfileRoutes);
 router.use("/heroes", heroesRoutes);
 router.use("/user", userRoutes);
 router.use("/token", tokenRoutes);
+router.use("/auth",googleSuccess);
 
 module.exports = router;
