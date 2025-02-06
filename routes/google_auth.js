@@ -48,7 +48,7 @@ router.get(
           secure: process.env.NODE_ENV === "production", 
           sameSite: "strict",
         });
-        const CLIENT_URL = "http://localhost:5173/auth/google/success";
+        const CLIENT_URL = "http://localhost:5173/auth/google/success/${token}/${userExist.wallet_address}";
         res.redirect(CLIENT_URL); 
     } catch (error) {
       console.error("Error during Google callback:", error);
