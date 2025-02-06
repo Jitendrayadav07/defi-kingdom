@@ -8,7 +8,12 @@ const USER_CONSTANTS = require("../constants/userConstants");
 const sendForgetEmail = require("../utils/sendForgetEmail");
 const sendEmail = require("../utils/sendEmail");
 const { ethers } = require("ethers");
+const contractABI = require("../classes/IProfilesABI.json");
 require("dotenv").config();
+
+// Load environment variables
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const RPC_URL = "https://subnets.avax.network/defi-kingdoms/dfk-chain/rpc";
 
 // Function to create a new wallet
 async function generateWallet() {
@@ -17,6 +22,65 @@ async function generateWallet() {
     address: wallet.address,
     privateKey: wallet.privateKey,
   };
+}
+
+async function createProfile(name, privateKey) {
+  try {
+
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const wallet = new ethers.Wallet(privateKey, provider);
+
+    const contractAddress = "0xC4cD8C09D1A90b21Be417be91A81603B03993E81";
+    // Replace with the correct ABI file
+
+    const contract = new ethers.Contract(contractAddress, contractABI, wallet);
+
+
+    // Call the function
+    const tx = await contract.createProfile(name, 0, 0);
+    console.log("Transaction sent, waiting for confirmation...");
+
+    const receipt = await tx.wait();
+
+    console.log("Profile Created! Transaction Hash:", receipt);
+    return receipt;
+  } catch (error) {
+    console.error("Error creating profile:", error);
+  }
+}
+
+async function transferNativeToken(RECEIVER_ADDRESS) {
+  try {
+    const AMOUNT_TO_SEND = "0.01"; // Amount to send in JEWELS
+    // Connect to the DFK Chain
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+
+    console.log(`Sender Address: ${wallet.address}`);
+    console.log(`Receiver Address: ${RECEIVER_ADDRESS}`);
+
+    // Get current gas price (Ethers v6)
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice;
+
+    // Create transaction
+    const tx = {
+      to: RECEIVER_ADDRESS,
+      value: ethers.parseEther(AMOUNT_TO_SEND), // Convert amount to Wei
+      gasLimit: 21000, // Standard gas limit for native transfers
+      gasPrice: gasPrice, // Fetch current gas price
+    };
+
+    // Send transaction
+    const txResponse = await wallet.sendTransaction(tx);
+    console.log(`Transaction Sent! Hash: ${txResponse.hash}`);
+
+    // Wait for transaction confirmation
+    const receipt = await txResponse.wait();
+    console.log(`Transaction Confirmed! Block Number: ${receipt.blockNumber}`);
+  } catch (error) {
+    console.error("Error sending transaction:", error);
+  }
 }
 
 const registerUser = async (req, res) => {
@@ -32,6 +96,10 @@ const registerUser = async (req, res) => {
 
     req.body.wallet_address = wallet_create.address;
     req.body.wallet_private_key = wallet_create.privateKey;
+
+    await transferNativeToken(req.body.wallet_address);
+
+    await createProfile(req.body.name, req.body.wallet_private_key);
 
     let user = await db.users.create(req.body);
 
