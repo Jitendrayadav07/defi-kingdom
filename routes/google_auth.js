@@ -7,6 +7,7 @@ const { JWT_SECRET } = require("../config/jwtTokenKey");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
+router.get("/google", passport.authenticate("google", { scope: ["profile","email"]  }));
 
 router.get(
   "/google/callback",
