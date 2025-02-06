@@ -34,6 +34,7 @@
     "passport-google-oauth20": "^2.0.0",
     "sequelize": "^6.37.5",
     "sequelize-cli": "^6.6.2",
+    "speakeasy": "^2.0.0",
     "util": "^0.12.5"
   }
 }
