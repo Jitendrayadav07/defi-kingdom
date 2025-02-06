@@ -5,9 +5,7 @@ class HeroesService {
         const query = `
             query GetHeroesByOwner($owner: String!) {
                 heroes(where: { owner: $owner }) {
-                    id
-                    mainClass
-                    rarity
+                    ${this.getHeroFields()}
                 }
             }
         `;
@@ -17,10 +15,8 @@ class HeroesService {
     async getHeroesById(id) {
         const query = `
             query GetHeroesNetworkById($id: ID!) {
-                heroes(where: { id: $id  }) {
-                    id
-                    mainClass
-                    network
+                heroes(where: { id: $id }) {
+                    ${this.getHeroFields()}
                     owner {
                         name
                     }
@@ -54,6 +50,18 @@ class HeroesService {
             }
         `;
         return await GraphQLService.request(query, { owner, pjStatus });
+    }
+
+    getHeroFields() {
+        return `
+            id mainClassStr subClassStr rarity stamina summons maxSummons xp level generation element background gender 
+            firstName lastName hp mp strength dexterity agility vitality endurance intelligence wisdom luck 
+            mining gardening foraging fishing 
+            strengthGrowthP dexterityGrowthP agilityGrowthP vitalityGrowthP enduranceGrowthP 
+            intelligenceGrowthP wisdomGrowthP luckGrowthP 
+            strengthGrowthS dexterityGrowthS agilityGrowthS vitalityGrowthS enduranceGrowthS 
+            intelligenceGrowthS wisdomGrowthS luckGrowthS
+        `;
     }
 }
 
