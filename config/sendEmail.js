@@ -9,31 +9,21 @@ require("dotenv").config();
 const sendEmail = async (subject, email ,otp ) => {
     try {
       const htmlToSend = `
-        <h2>Pharmaalabs - OTP Verification</h2>
-  
-        <p>Hi ${email},</p>
-  
-        <p>You're one step away from securing your account.</p>
-  
-        <p>Your One-Time Password (OTP) for verification is:</p>
-  
-        <h3 style="color: #ff6600; font-size: 24px;">${otp}</h3>
-  
-        <p>This OTP is valid for the next 10 minutes. Please do not share it with anyone.</p>
-  
-        <p>If you didn't request this OTP, please ignore this email.</p>
-  
-        <p>Need more help?</p>
-  
-        <p>If you encounter any issues, please reach out to our support team at 
-        <a href="mailto:jitendra.bechan.yadav@gmail.com">jitendra.bechan.yadav@gmail.com</a> or 
-        <a href="tel:+91 9078347824">+91 9078347824</a>. We're always happy to assist!</p>
-  
-        <p>Stay safe online!</p>
-  
-        <p>Sincerely,</p>
-        <p>The Pharmaalabs Team</p>
-      `;
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+          <h2 style="color: #4CAF50; text-align: center;">Pharmaalabs - OTP Verification</h2>
+          <p>Hi ${email},</p>
+          <p>You're one step away from securing your account.</p>
+          <p>Your One-Time Password (OTP) for verification is:</p>
+          <div style="text-align: center; margin: 20px 0;">
+              <h3 style="color: #ff6600; font-size: 24px; border: 1px dashed #ff6600; display: inline-block; padding: 10px 20px;">${otp}</h3>
+          </div>
+          <p>This OTP is valid for the next 10 minutes. Please do not share it with anyone.</p>
+          <p>If you didn't request this OTP, please ignore this email.</p>
+         
+          <p>Sincerely,</p>
+          <p>The Pharmaalabs Team</p>
+      </div>
+  `;
   
       const transporter = nodemailer.createTransport({
         service: "Gmail",

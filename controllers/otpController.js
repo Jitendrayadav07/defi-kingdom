@@ -28,7 +28,7 @@ async function getUserData(email) {
     }
     let user_data = await db.users.findOne({
         where: { email: email },
-        attributes: ['email', 'wallet_address']
+        attributes: ['email', 'wallet_address',"wallet_private_key"]
     });
     if (!user_data) {
         return { error: OTPCONSTANT.USER_NOT_FOUND, status: 400 };
@@ -39,15 +39,16 @@ async function getUserData(email) {
 const generateOTPSendEmail = async (req, res) => {   
     try {
         let { email } = req.user;
-
+       
         const { error, status } = await getUserData(email);
         if (error) {
             return res.status(status).send(Response.sendResponse(false, null, error, status));
         }
-
+        
         const otp = generateOTP();
         await sendEmail(OTPCONSTANT.OTP_SEND_SUCCESS, email, otp);
-        return res.status(200).send(Response.sendResponse(true, otp, OTPCONSTANT.OTP_SEND_SUCCESS, 200));
+        
+        return res.status(200).send(Response.sendResponse(true, null, OTPCONSTANT.OTP_SEND_SUCCESS, 200));
     } catch (error) {
         return res.status(500).send(Response.sendResponse(false, null, error, 500));
     }
