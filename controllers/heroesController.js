@@ -68,12 +68,12 @@ const getOwnerHeroesByAddress = async (req, res) => {
     try {
         const ownerAddress = req.query.address;
         if (!ownerAddress) {
-            return res.status(400).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 400));
+            return res.status(400).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 400));
         }
 
         const data = await HeroesService.getHeroesByOwner(ownerAddress);
         if (!data.heroes || data.heroes.length === 0) {
-            return res.status(404).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
+            return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
 
         const heroPromises = data.heroes.map(async (hero) => {
