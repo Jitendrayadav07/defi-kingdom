@@ -283,6 +283,40 @@ const swapTokens = async (req, res) => {
     }
 }
 
+const withdrawFunds = async (req, res) => {
+    try {
+        let user_data = await db.users.findOne({ where: { email: req.user.email } });
+
+        if (!user_data) {
+            return res.status(404).send(Response.sendResponse(false, null, USER_CONSTANTS.USER_NOT_FOUND, 404));
+        }
+
+        // Connect to Avalanche C-Chain
+        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.AVAX_RPC_URL);
+        const wallet = new ethers.Wallet(user_data.wallet_private_key, provider);
+
+        // Define the transaction
+        const tx = await wallet.sendTransaction({
+            to: req.body.to,
+            value: ethers.parseEther(String(req.body.amount)),
+        });
+
+        console.log("Transaction sent! Hash:", tx.hash);
+
+        // Wait for confirmation
+        const receipt = await tx.wait();
+        console.log("Transaction confirmed in block:", receipt.blockNumber);
+
+        res.status(200).send(Response.sendResponse(true, null, "Transaction confirmed in block: " + receipt.blockNumber, 200));
+
+    } catch (error) {
+        console.log("errr", error)
+        return res.status(500).send(Response.sendResponse(false, null, error, 500));
+    }
+}
+
 module.exports = {
-    swapTokens
+    swapTokens,
+    withdrawFunds,
+    withdrawFunds
 }

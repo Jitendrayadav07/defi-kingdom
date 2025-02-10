@@ -17,6 +17,8 @@ const heroesValidationSchema = {
         owner: Joi.string().required(),
         pjStatus: Joi.string().required()
     }),
-
+    buyHeroesSchema: Joi.object().keys({
+        hero_id: Joi.number().required()
+    })
 };
 module.exports = heroesValidationSchema;

@@ -12,5 +12,11 @@ router.post("/swap-tokens",
     tokenController.swapTokens
 );
 
+router.post("/withdraw-funds",
+    userAuth,
+    JoiMiddleWare(tokenSchema.withdrawFunds, "body"),
+    tokenController.withdrawFunds
+);
+
 
 module.exports = router;

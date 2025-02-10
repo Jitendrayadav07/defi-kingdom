@@ -6,6 +6,10 @@ const tokenValidationSchema = {
         from: Joi.string().required(),
         to: Joi.string().required(),
     }),
+    withdrawFunds: Joi.object().keys({
+        amount: Joi.string().required(),
+        to: Joi.string().required(),
+    })
 }
 
 module.exports = tokenValidationSchema;
