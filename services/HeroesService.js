@@ -54,13 +54,13 @@ class HeroesService {
 
     getHeroFields() {
         return `
-            id mainClassStr subClassStr rarity stamina summons maxSummons xp level generation element background gender 
+            id mainClassStr subClassStr rarity stamina staminaFullAt summons maxSummons xp level generation element background gender 
             firstName lastName hp mp strength dexterity agility vitality endurance intelligence wisdom luck 
             mining gardening foraging fishing 
             strengthGrowthP dexterityGrowthP agilityGrowthP vitalityGrowthP enduranceGrowthP 
             intelligenceGrowthP wisdomGrowthP luckGrowthP 
             strengthGrowthS dexterityGrowthS agilityGrowthS vitalityGrowthS enduranceGrowthS 
-            intelligenceGrowthS wisdomGrowthS luckGrowthS
+            intelligenceGrowthS wisdomGrowthS luckGrowthS currentQuest
         `;
     }
 }

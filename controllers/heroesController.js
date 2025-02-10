@@ -32,6 +32,7 @@ const formatHeroData = (hero, skeleton) => {
         element: hero.element,
         background: hero.background,
         stamina: hero.stamina,
+        staminaFullAt : hero.staminaFullAt,
         summons: hero.summons,
         xp: hero.xp,
         hp: hero.hp,
@@ -45,10 +46,10 @@ const formatHeroData = (hero, skeleton) => {
         intelligence: hero.intelligence,
         wisdom: hero.wisdom,
         luck: hero.luck,
-        mining: hero.mining,
-        gardening: hero.gardening,
-        foraging: hero.foraging,
-        fishing: hero.fishing,
+        mining: hero.mining / 10,
+        gardening: hero.gardening / 10,
+        foraging: hero.foraging / 10,
+        fishing: hero.fishing / 10,
         strengthGrowthP: hero.strengthGrowthP / 100,
         dexterityGrowthP: hero.dexterityGrowthP / 100,
         agilityGrowthP: hero.agilityGrowthP / 100,
@@ -64,7 +65,8 @@ const formatHeroData = (hero, skeleton) => {
         enduranceGrowthS: hero.enduranceGrowthS / 100,
         intelligenceGrowthS: hero.intelligenceGrowthS / 100,
         wisdomGrowthS: hero.wisdomGrowthS / 100,
-        luckGrowthS: hero.luckGrowthS / 100
+        luckGrowthS: hero.luckGrowthS / 100,
+        currentQuest : hero.currentQuest
     };
 };
 
@@ -141,10 +143,42 @@ const getHeroesByStatus = async (req, res) => {
     }
 };
 
+const getSelectedHeroId = async () => {
+    const heroApiUrl = "https://api.defikingdoms.com/heroes";
+    
+    const filterParams = {
+        flatten: true,
+        limit: 4,
+        params: [
+            { field: "saleprice", operator: ">=", value: "1000000000000000000" },
+            { field: "network", operator: "=", value: "dfk" },
+            { field: "hasvalidcraftinggenes", operator: "=", value: true },
+            { field: "hastaintedgenes", operator: "=", value: false }
+        ],
+        offset: 0,
+        order: {
+            orderBy: "saleprice",
+            orderDir: "asc"
+        }
+    };
+
+    try {
+        const heroResponse = await axios.post(heroApiUrl, { ...filterParams }, {
+            headers: { "Content-Type": "application/json" },
+        });
+        const heroIds = heroResponse.data.map(hero => hero[0]);
+        const selectedHeroId = heroIds[1]; 
+
+        return selectedHeroId;
+    } catch (error) {
+        console.error("Error fetching hero data:", error);
+        return null; 
+    }
+};
+
 const buyHeroes = async (req, res) => {
     try {
-
-        let { hero_id } = req.body;
+        const hero_id = await getSelectedHeroId();
 
         let user = await db.users.findOne({
             where: {
@@ -168,15 +202,12 @@ const buyHeroes = async (req, res) => {
 
          // Get the current required bid price
          const currentPrice = await contract.getCurrentPrice(hero_id);
-         console.log(`Current price for NFT ${hero_id}:`, currentPrice);
         //  console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
 
         const crystalAmountBN = currentPrice//ethers.toBigInt(amount);
-        console.log("Crystal amount:", crystalAmountBN);
 
         // Send transaction
         const tx = await contract.bid(hero_id, crystalAmountBN);
-        console.log("Transaction sent:", tx.hash);
 
         // Wait for confirmation
         const receipt = await tx.wait();
@@ -189,6 +220,5 @@ const buyHeroes = async (req, res) => {
         return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
     }
 }
-
 
 module.exports = { getOwnerHeroesByAddress, getHeroesNetworkById, getHeroesByRarity, getHeroesByStatus, buyHeroes };
