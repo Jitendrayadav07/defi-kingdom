@@ -27,7 +27,6 @@ router.get("/heroes-status",
 
 router.post("/buy-heroes", 
     userAuth,
-    JoiMiddleWare(heroesValidationSchema.buyHeroesSchema, "body"),
     heroesController.buyHeroes
 );
 
