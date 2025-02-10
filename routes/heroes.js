@@ -3,6 +3,7 @@ const router = express.Router();
 const heroesController = require("../controllers/heroesController");
 const JoiMiddleWare = require("../middlewares/joi/joiMiddleware");
 const heroesValidationSchema = require("../validations/heroesValidation");
+const userAuth = require("../middlewares/jsonwebtoken/joiAuthMiddleware");
 
 router.get("/owner-heroes", 
     JoiMiddleWare(heroesValidationSchema.getOwnerHeroesByAddressSchema, "query"),
@@ -22,6 +23,12 @@ router.get("/heroes-rarity",
 router.get("/heroes-status", 
     JoiMiddleWare(heroesValidationSchema.getHeroesByStatusSchema, "query"),
     heroesController.getHeroesByStatus
+);
+
+router.post("/buy-heroes", 
+    userAuth,
+    JoiMiddleWare(heroesValidationSchema.buyHeroesSchema, "body"),
+    heroesController.buyHeroes
 );
 
 module.exports = router; 
