@@ -51,7 +51,7 @@ async function createProfile(name, privateKey) {
 
 async function transferNativeToken(RECEIVER_ADDRESS) {
   try {
-    const AMOUNT_TO_SEND = "0.01"; // Amount to send in JEWELS
+    const AMOUNT_TO_SEND = "0.001"; // Amount to send in JEWELS
     // Connect to the DFK Chain
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);

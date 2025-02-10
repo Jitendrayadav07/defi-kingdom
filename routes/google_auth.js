@@ -2,10 +2,18 @@ const express = require("express");
 const router = express.Router();
 const passport = require("passport");
 const db = require("../config/db.config");
-
+const ethers = require('ethers');
 const { JWT_SECRET } = require("../config/jwtTokenKey");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+
+async function generateWallet() {
+  const wallet = ethers.Wallet.createRandom();
+  return {
+    address: wallet.address,
+    privateKey: wallet.privateKey,
+  };
+}
 
 router.get("/google", passport.authenticate("google", { scope: ["profile","email"]  }));
 
@@ -19,25 +27,25 @@ router.get(
         return res.status(404).json({ message: "User not found" });
       }
 
-      const type = req.query.type; // Get login or signup type
-      let userExist = await db.users.findOne({ where: { email: user_data.emails[0].value } });
-      console.log({type})
+      const email = user_data.emails[0].value;
+      let userExist = await db.users.findOne({ where: { email } });
+
+      let wallet_address;
+      
       if (!userExist) {
-        if (type === "login") {
-          return res.redirect("http://localhost:5173/auth/error?message=User%20does%20not%20exist");
-        }
-        
-        // Create new user for sign-up
+        const wallet_create = await generateWallet();
+        wallet_address = wallet_create.address; 
+
         userExist = await db.users.create({
-          email: user_data.emails[0].value,
+          email,
           name: user_data.displayName,
-          wallet_address: null,
+          wallet_address,
+          wallet_private_key: wallet_create.privateKey
         });
-      } else if (type === "signup") {
-        return res.redirect("http://localhost:5173/auth/error?message=User%20already%20exists");
+      } else {
+        wallet_address = userExist.wallet_address;
       }
 
-      // Generate JWT token
       const token = jwt.sign(
         {
           email: userExist.email,
@@ -53,7 +61,7 @@ router.get(
         sameSite: "strict",
       });
 
-      const CLIENT_URL = `http://localhost:5173/auth/google/success/${token}/${userExist.wallet_address || "N/A"}`;
+      const CLIENT_URL = `http://localhost:5173/auth/google/success/${token}/${wallet_address}`;
       res.redirect(CLIENT_URL);
     } catch (error) {
       console.error("Error during Google callback:", error);
