@@ -9,7 +9,7 @@ const userAuth = require("../middlewares/jsonwebtoken/joiAuthMiddleware");
 router.post("/swap-tokens",
     userAuth,
     JoiMiddleWare(tokenSchema.swapTokens, "body"),
-    tokenController.swapTokens
+    tokenController.aiAgentAction
 );
 
 router.post("/withdraw-funds",

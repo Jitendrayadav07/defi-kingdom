@@ -5,8 +5,15 @@ const TOKEN_CONSTANTS = require("../constants/tokenConstants");
 const db = require("../config/db.config");
 const axios = require('axios');
 const { ethers } = require("ethers");
+const RPC_URL = TOKEN_CONSTANTS.DFK_RPC_URL;
+const QUEST_CORE_CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752"; // Mainnet QuestCoreV3 contract address
+const FISHING_QUEST_ADDRESS = "0x08BDdaB7d681c6406fE61d261c26Da80678874f6";  // Mainnet Fishing Quest contract address
+const FORAGING_QUEST_ADDRESS = "0x08BDdaB7d681c6406fE61d261c26Da80678874f6"; // Mainnet Foraging Quest contract address
 
-
+const QUEST_ABI = [
+    "function getHeroQuest(uint256 heroId) view returns (tuple(uint256 id, uint256 questInstanceId, uint8 level, uint256[] heroes, address player, uint256 startBlock, uint256 startAtTime, uint256 completeAtTime, uint8 attempts, uint8 status, uint8 questType))",
+    "function startQuest(uint256[] _heroIds, uint256 _questInstanceId, uint8 _attempts, uint8 _level, uint8 _type)",
+];
 
 const fetchHeroSkeleton = async (heroId) => {
     const url = `https://heroes.defikingdoms.com/token/${heroId}`;
@@ -19,7 +26,7 @@ const fetchHeroSkeleton = async (heroId) => {
     }
 };
 
-const formatHeroData = (hero, skeleton) => {
+const formatHeroData = async (hero, skeleton) => {
     return {
         id: skeleton?.heroData?.id || hero.id,
         image: skeleton?.image || null,
@@ -46,8 +53,8 @@ const formatHeroData = (hero, skeleton) => {
         intelligence: hero.intelligence,
         wisdom: hero.wisdom,
         luck: hero.luck,
-        mining: hero.mining / 10,
-        gardening: hero.gardening / 10,
+        mining: hero.mining,
+        gardening: hero.gardening,
         foraging: hero.foraging / 10,
         fishing: hero.fishing / 10,
         strengthGrowthP: hero.strengthGrowthP / 100,
@@ -176,21 +183,18 @@ const getSelectedHeroId = async () => {
     }
 };
 
-const buyHeroes = async (req, res) => {
+const heroesStamina = async (req, res) => {
     try {
-        const hero_id = await getSelectedHeroId();
-
         let user = await db.users.findOne({
             where: {
                 email: req.user.email
             }
         });
 
-        // Contract details
-        const CONTRACT_ADDRESS = "0xc390fAA4C7f66E4D62E59C231D5beD32Ff77BEf0";
-        const ABI = [
-            "function bid(uint256 amount, uint256 price) public",
-            "function getCurrentPrice(uint256 _tokenId) view returns (uint256)",
+        const CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752";
+
+        const ABI = [   
+            "function getCurrentStamina(uint256 _heroId) view returns (uint256)",
         ];
 
         const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
@@ -200,25 +204,145 @@ const buyHeroes = async (req, res) => {
         const wallet = new ethers.Wallet(privateKey, provider);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
-         // Get the current required bid price
-         const currentPrice = await contract.getCurrentPrice(hero_id);
-        //  console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
+        const hero_id = req.query.id;
+        const stamina = await contract.getCurrentStamina(hero_id);
 
-        const crystalAmountBN = currentPrice//ethers.toBigInt(amount);
+        const staminaValue = Number(stamina);
 
-        // Send transaction
-        const tx = await contract.bid(hero_id, crystalAmountBN);
-
-        // Wait for confirmation
-        const receipt = await tx.wait();
-        console.log("Transaction confirmed:", receipt);
-
-        return res.status(200).send(Response.sendResponse(true, null, HEROES_CONSTANTS_STATUS.HEROES_BOUGHT, 200));
-
-    } catch (error) {
+        return res.status(200).send(Response.sendResponse(true, staminaValue, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
+    }
+    catch (error) {
         console.log(error);
         return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
     }
 }
 
-module.exports = { getOwnerHeroesByAddress, getHeroesNetworkById, getHeroesByRarity, getHeroesByStatus, buyHeroes };
+async function getHeroeStamina(heroId) {
+    const CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752";
+    const ABI = [   
+        "function getCurrentStamina(uint256 _heroId) view returns (uint256)",
+    ];
+
+    const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+
+    const stamina = await contract.getCurrentStamina(heroId);
+    return stamina;
+}
+
+const heroesStartQuest = async (req, res) => {
+    try {
+        let user = await db.users.findOne({ where: { email: req.user.email } });
+        let wallet_address = user.wallet_address;
+        let wallet_private_key = user.wallet_private_key;
+        const data = await HeroesService.getHeroesByOwner(wallet_address);
+
+        if (!data.heroes || data.heroes.length === 0) {
+            return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
+        }
+
+        const hero_id = data.heroes[3].id
+
+        const skeleton = await fetchHeroSkeleton(hero_id);
+
+        let hero_formated_data = await formatHeroData(data.heroes[0], skeleton);
+
+        let stamina = await getHeroeStamina(hero_id);
+  
+        if(stamina < 7){
+            return res.status(400).send(Response.sendResponse(false, null, "Hero stamina is not enough", 400));
+        }
+
+        let heroIds = Array.isArray(hero_id) ? hero_id : [hero_id];
+
+        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
+        const wallet = new ethers.Wallet(wallet_private_key, provider);
+        const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
+        let heroe_quest = await contract.getHeroQuest(hero_id);
+
+        let questStatus = Number(heroe_quest[9]);
+
+        const QuestStatus = {
+            NONE: 0,
+            STARTED: 1,
+            COMPLETED: 2,
+            CANCELED: 3,
+            EXPEDITION: 4
+        };
+
+        if (questStatus === QuestStatus.STARTED || questStatus === QuestStatus.EXPEDITION) {
+            return res.status(400).send(Response.sendResponse(false, null, "Hero is already on an active quest", 400));
+        }
+
+        const attempts = 3;
+        const level = 0;
+        const questTypeId = 0;
+        const questInstanceId = 1; // Replace with actual instance ID
+
+        console.log(`🚀 Starting Quest for heroes: ${heroIds}`);
+        const tx = await contract.startQuest(heroIds, questInstanceId, attempts, level, questTypeId )
+        const receipt = await tx.wait();
+        console.log("Transaction confirmed in block:", receipt.blockNumber);
+
+        return res.status(200).send(Response.sendResponse(true, receipt, "Quest started successfully", 200));
+    } catch (error) {
+        console.error("❌ Error starting quest:", error);
+        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
+    }
+};
+
+
+const heroesCompleteQuest = async (req, res) => {
+    try {
+        let user = await db.users.findOne({ where: { email: req.user.email } });
+        let wallet_address = user.wallet_address;
+        let wallet_private_key = user.wallet_private_key;
+        const data = await HeroesService.getHeroesByOwner(wallet_address);
+
+        if (!data.heroes || data.heroes.length === 0) {
+            return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
+        }
+
+        const hero_id = data.heroes[3].id;
+        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
+        const wallet = new ethers.Wallet(wallet_private_key, provider);
+        const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
+        let heroe_quest = await contract.getHeroQuest(hero_id);
+        let questStatus = Number(heroe_quest[9]);
+
+        const QuestStatus = {
+            NONE: 0,
+            STARTED: 1,
+            COMPLETED: 2,
+            CANCELED: 3,
+            EXPEDITION: 4
+        };
+
+        if (questStatus !== QuestStatus.COMPLETED) {
+            return res.status(400).send(Response.sendResponse(false, null, "Hero's quest is not yet completed", 400));
+        }
+
+        console.log(`🏆 Completing Quest for hero: ${hero_id}`);
+        const tx = await contract.completeQuest(hero_id);
+        const receipt = await tx.wait();
+        console.log("✅ Quest completed in block:", receipt.blockNumber);
+
+        return res.status(200).send(Response.sendResponse(true, receipt, "Quest completed successfully", 200));
+    } catch (error) {
+        console.error("❌ Error completing quest:", error);
+        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
+    }
+};
+
+
+         
+
+module.exports = {
+    getOwnerHeroesByAddress, 
+    getHeroesNetworkById, 
+    getHeroesByRarity,
+    getHeroesByStatus, 
+    heroesStamina ,
+    heroesStartQuest ,
+    heroesCompleteQuest
+};

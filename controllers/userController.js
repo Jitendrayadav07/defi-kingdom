@@ -205,10 +205,37 @@ const setUserPassword = async (req, res) => {
   }
 };
 
+const getUserProfilesData = async (req, res) => {
+  try {
+    let user_data = await db.users.findOne({ where: { email: req.user.email }, attributes: { exclude: ['password', 'wallet_private_key'] } });
+    return res.status(200).send(Response.sendResponse(true, user_data, USER_CONSTANTS.USER_PROFILES, 200));
+  } catch (error) {
+    return res.status(500).send(Response.sendResponse(false, null, error, 500));
+  }
+}
+
+const updateTelegramUsername = async (req, res) => {
+  try {
+    let { telegram_username , id  } = req.body
+    let user_data = await db.users.findOne({ where: { id: id } })
+    
+    if (!user_data) {
+      return res.status(400).send(Response.sendResponse(false, null, USER_CONSTANTS.USER_NOT_FOUND, 400));
+    } 
+
+    let user_update = await db.users.update({ telegram_username: telegram_username }, { where: { email: req.user.email } })
+    return res.status(200).send(Response.sendResponse(true,user_update,USER_CONSTANTS.USER_UPDATED,200));
+    
+  } catch (error) {
+    return res.status(500).send(Response.sendResponse(false, null, error, 500));
+  }
+}
 
 module.exports = {
   registerUser,
   userSignIn,
   forgotPassword,
-  setUserPassword
+  setUserPassword,
+  getUserProfilesData,
+  updateTelegramUsername
 }
