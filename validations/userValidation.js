@@ -45,6 +45,11 @@ const userSchema = {
         }, 'custom password complexity'),
     }),
 
+    updateTelegramUsername : Joi.object().keys({
+        id: Joi.number().required(),
+        telegram_username : Joi.string().required()
+    })
+
 };
 
 module.exports = userSchema;

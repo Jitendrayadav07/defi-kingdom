@@ -25,9 +25,20 @@ router.get("/heroes-status",
     heroesController.getHeroesByStatus
 );
 
-router.post("/buy-heroes", 
+router.get("/heroes-stamina", 
     userAuth,
-    heroesController.buyHeroes
+    JoiMiddleWare(heroesValidationSchema.getHeroesNetworkByIdSchema, "query"),
+    heroesController.heroesStamina
+);
+
+router.post("/heroes-start-quest", 
+    userAuth,
+    heroesController.heroesStartQuest
+);
+
+router.post("/heroes-completed-quest", 
+    userAuth,
+    heroesController.heroesCompleteQuest
 );
 
 module.exports = router; 
