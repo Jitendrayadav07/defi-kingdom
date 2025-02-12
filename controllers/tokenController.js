@@ -5,6 +5,7 @@ const USER_CONSTANTS = require("../constants/userConstants");
 const TOKEN_CONSTANTS = require("../constants/tokenConstants");
 const { ethers } = require("ethers");
 require("dotenv").config();
+const heroesController = require('./heroesController');
 
 const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
 const routerAddress = TOKEN_CONSTANTS.ROUTER_ADDRESS;
@@ -163,12 +164,15 @@ async function tokenToToken(amount, wallet, from, path) {
 const aiAgentAction = async (req, res) => {
     try {
         let { action } = req.body;
+        action = action?.toLowerCase();
 
         switch (action) {
             case "swap-tokens":
                 return swapTokens(req, res);
-            case "buy-heroes":
-                return buyHeroes(req, res);
+            case "buy_heroes":
+                return heroesController.buyHeroes(req, res);
+            case "start_quest":
+                return heroesController.heroesStartQuest(req, res);
             default:
                 return res.status(400).send(Response.sendResponse(false, null, "Invalid action", 400));
         }
@@ -300,49 +304,6 @@ async function swapTokens(req, res) {
     }
 }
 
-async function buyHeroes(req, res) {
-    try {
-        const hero_id = await getSelectedHeroId();
-        let user = await db.users.findOne({
-            where: {
-                email: req.user.email
-            }
-        });
-
-        // Contract details
-        const CONTRACT_ADDRESS = "0xc390fAA4C7f66E4D62E59C231D5beD32Ff77BEf0";
-        const ABI = [
-            "function bid(uint256 amount, uint256 price) public",
-            "function getCurrentPrice(uint256 _tokenId) view returns (uint256)",
-        ];
-
-        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
-
-        let privateKey = user.wallet_private_key;
-
-        const wallet = new ethers.Wallet(privateKey, provider);
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
-
-         // Get the current required bid price
-         const currentPrice = await contract.getCurrentPrice(hero_id);
-         console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
-
-        const crystalAmountBN = currentPrice//ethers.toBigInt(amount);
-
-        // Send transaction
-        const tx = await contract.bid(hero_id, crystalAmountBN);
-
-        // Wait for confirmation
-        const receipt = await tx.wait();
-        console.log("Transaction confirmed:", receipt);
-
-        return res.status(200).send(Response.sendResponse(true, null, HEROES_CONSTANTS_STATUS.HEROES_BOUGHT, 200));
-
-    } catch (error) {
-        console.log(error);
-        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
-    }
-}
 
 const withdrawFunds = async (req, res) => {
     try {
