@@ -344,7 +344,15 @@ const heroesStartQuest = async (req, res) => {
         };
         
         await db.hero_quests.create(questData);
-
+        let chatId = await db.users.findOne({
+            where: { email: req.user.email },
+            attributes: { include: ["telegram_username"] },
+          });
+        
+        await axios.post(process.env.TELEGRAM_API_URL, {
+            chat_id: chatId.dataValues.telegram_chatid,
+            text: "Hero is been started on Quest please login and check your Defi kingdom portal for more info",
+        });
         return res.status(200).send(Response.sendResponse(true, receipt, "Quest started successfully", 200));
     } catch (error) {
         console.error("❌ Error starting quest:", error);
@@ -402,15 +410,18 @@ const heroesCompleteQuest = async (hero_id,wallet_address) => {
         const receipt = await tx.wait();
         console.log("✅ Quest completed in block:", receipt.blockNumber);
         await db.hero_quests.update({ quest_status: 3 }, { where: { hero_id: hero_id } });
+
+        await axios.post(process.env.TELEGRAM_API_URL, {
+            chat_id: chatId.dataValues.telegram_chatid,
+            text: "Hero Quest is been Completed, Please login to Defi Kingdom portal for more Info",
+        });
         return true
+
     } catch (error) {
         console.error("❌ Error completing quest:", error);
         return false;
     }
 };
-
-
-         
 
 module.exports = {
     getOwnerHeroesByAddress, 
