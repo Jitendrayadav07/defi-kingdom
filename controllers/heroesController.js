@@ -13,6 +13,7 @@ const FORAGING_QUEST_ADDRESS = "0x08BDdaB7d681c6406fE61d261c26Da80678874f6"; // 
 const QUEST_ABI = [
     "function getHeroQuest(uint256 heroId) view returns (tuple(uint256 id, uint256 questInstanceId, uint8 level, uint256[] heroes, address player, uint256 startBlock, uint256 startAtTime, uint256 completeAtTime, uint8 attempts, uint8 status, uint8 questType))",
     "function startQuest(uint256[] _heroIds, uint256 _questInstanceId, uint8 _attempts, uint8 _level, uint8 _type)",
+    "function completeQuest(uint256 _heroId)",
 ];
 
 const fetchHeroSkeleton = async (heroId) => {
@@ -53,8 +54,8 @@ const formatHeroData = async (hero, skeleton) => {
         intelligence: hero.intelligence,
         wisdom: hero.wisdom,
         luck: hero.luck,
-        mining: hero.mining,
-        gardening: hero.gardening,
+        mining: hero.mining / 10,
+        gardening: hero.gardening / 10,
         foraging: hero.foraging / 10,
         fishing: hero.fishing / 10,
         strengthGrowthP: hero.strengthGrowthP / 100,
@@ -230,23 +231,66 @@ async function getHeroeStamina(heroId) {
     return stamina;
 }
 
+const buyHeroes = async (req, res) =>{
+    try {
+        const hero_id = await getSelectedHeroId();
+        let user = await db.users.findOne({
+            where: {
+                email: req.user.email
+            }
+        });
+
+        // Contract details
+        const CONTRACT_ADDRESS = "0xc390fAA4C7f66E4D62E59C231D5beD32Ff77BEf0";
+        const ABI = [
+            "function bid(uint256 amount, uint256 price) public",
+            "function getCurrentPrice(uint256 _tokenId) view returns (uint256)",
+        ];
+
+        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
+
+        let privateKey = user.wallet_private_key;
+
+        const wallet = new ethers.Wallet(privateKey, provider);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+
+         // Get the current required bid price
+         const currentPrice = await contract.getCurrentPrice(hero_id);
+         console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
+
+        const crystalAmountBN = currentPrice//ethers.toBigInt(amount);
+
+        // Send transaction
+        const tx = await contract.bid(hero_id, crystalAmountBN);
+
+        // Wait for confirmation
+        const receipt = await tx.wait();
+        console.log("Transaction confirmed:", receipt);
+
+        return res.status(200).send(Response.sendResponse(true, null, HEROES_CONSTANTS_STATUS.HEROES_BOUGHT, 200));
+
+    } catch (error) {
+        console.log(error);
+        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
+    }
+}
+
 const heroesStartQuest = async (req, res) => {
     try {
         let user = await db.users.findOne({ where: { email: req.user.email } });
         let wallet_address = user.wallet_address;
         let wallet_private_key = user.wallet_private_key;
         const data = await HeroesService.getHeroesByOwner(wallet_address);
-
         if (!data.heroes || data.heroes.length === 0) {
             return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
 
-        const hero_id = data.heroes[3].id
-
+        const hero_id = data.heroes[1].id
+        console.log("hero_id",hero_id);
         const skeleton = await fetchHeroSkeleton(hero_id);
 
         let hero_formated_data = await formatHeroData(data.heroes[0], skeleton);
-
+        console.log("hero_formated_data",hero_formated_data);
         let stamina = await getHeroeStamina(hero_id);
   
         if(stamina < 7){
@@ -258,9 +302,10 @@ const heroesStartQuest = async (req, res) => {
         const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
         const wallet = new ethers.Wallet(wallet_private_key, provider);
         const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
-        let heroe_quest = await contract.getHeroQuest(hero_id);
-
-        let questStatus = Number(heroe_quest[9]);
+        let heroes_quest = await contract.getHeroQuest(hero_id);
+        console.log("heroes_quest",heroes_quest);
+        let questStatus = Number(heroes_quest[9]);
+        console.log("questStatus",questStatus);
 
         const QuestStatus = {
             NONE: 0,
@@ -269,20 +314,36 @@ const heroesStartQuest = async (req, res) => {
             CANCELED: 3,
             EXPEDITION: 4
         };
-
+ 
         if (questStatus === QuestStatus.STARTED || questStatus === QuestStatus.EXPEDITION) {
             return res.status(400).send(Response.sendResponse(false, null, "Hero is already on an active quest", 400));
         }
 
-        const attempts = 3;
+        const attempts = 1;
         const level = 0;
         const questTypeId = 0;
-        const questInstanceId = 1; // Replace with actual instance ID
-
+        const questInstanceId = 1; 
         console.log(`🚀 Starting Quest for heroes: ${heroIds}`);
         const tx = await contract.startQuest(heroIds, questInstanceId, attempts, level, questTypeId )
         const receipt = await tx.wait();
         console.log("Transaction confirmed in block:", receipt.blockNumber);
+
+        let heroes_quest_new = await contract.getHeroQuest(hero_id);
+        const questData = {
+            hero_id: hero_id,
+            quest_start_time: heroes_quest_new[6].toString(),
+            quest_end_time: heroes_quest_new[7].toString(),
+            quest_status: heroes_quest_new[1].toString(),
+            hero_level: heroes_quest_new[1].toString(),
+            hero_experience: heroes_quest_new[2].toString(),
+            wallet_address: heroes_quest_new[4],
+            start_time: heroes_quest_new[6].toString(),
+            end_time: heroes_quest_new[7].toString(),
+            quest_instance_id: heroes_quest_new[8].toString(),
+            hero_address: heroes_quest_new[5]
+        };
+        
+        await db.hero_quests.create(questData);
 
         return res.status(200).send(Response.sendResponse(true, receipt, "Quest started successfully", 200));
     } catch (error) {
@@ -291,46 +352,60 @@ const heroesStartQuest = async (req, res) => {
     }
 };
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const heroesCompleteQuest = async (req, res) => {
+const runQuestCheck = async () => {
     try {
-        let user = await db.users.findOne({ where: { email: req.user.email } });
-        let wallet_address = user.wallet_address;
-        let wallet_private_key = user.wallet_private_key;
-        const data = await HeroesService.getHeroesByOwner(wallet_address);
+        const quest = await db.hero_quests.findOne({
+            where: {
+                quest_status: 1,
+            },
+        });
 
-        if (!data.heroes || data.heroes.length === 0) {
-            return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
+        if (quest) {
+            const currentTimestamp = Math.floor(Date.now() / 1000); 
+            console.log("currentTimestamp",currentTimestamp);
+            if (currentTimestamp >= quest.end_time) {
+                console.log(`Quest for hero ${quest.hero_id} has ended. Completing quest...`);
+                await heroesCompleteQuest(quest.hero_id,quest.wallet_address);
+            }
+        } else {
+            console.log('No quest found or quest is not started yet.');
         }
+    } catch (error) {
+        console.error('Error in quest check:', error);
+    }
+};
 
-        const hero_id = data.heroes[3].id;
+const startCronJob = async () => {
+    while (true) {
+        await runQuestCheck(); 
+        console.log('Waiting for 20 seconds before next check...');
+        await sleep(5000); 
+    }
+};
+
+startCronJob();
+
+
+const heroesCompleteQuest = async (hero_id,wallet_address) => {
+    try {
+        let user = await db.users.findOne({ where: { wallet_address: wallet_address } });
+        let wallet_private_key = user.wallet_private_key;
+
         const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
         const wallet = new ethers.Wallet(wallet_private_key, provider);
         const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
-        let heroe_quest = await contract.getHeroQuest(hero_id);
-        let questStatus = Number(heroe_quest[9]);
-
-        const QuestStatus = {
-            NONE: 0,
-            STARTED: 1,
-            COMPLETED: 2,
-            CANCELED: 3,
-            EXPEDITION: 4
-        };
-
-        if (questStatus !== QuestStatus.COMPLETED) {
-            return res.status(400).send(Response.sendResponse(false, null, "Hero's quest is not yet completed", 400));
-        }
 
         console.log(`🏆 Completing Quest for hero: ${hero_id}`);
         const tx = await contract.completeQuest(hero_id);
         const receipt = await tx.wait();
         console.log("✅ Quest completed in block:", receipt.blockNumber);
-
-        return res.status(200).send(Response.sendResponse(true, receipt, "Quest completed successfully", 200));
+        await db.hero_quests.update({ quest_status: 3 }, { where: { hero_id: hero_id } });
+        return true
     } catch (error) {
         console.error("❌ Error completing quest:", error);
-        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
+        return false;
     }
 };
 
@@ -343,6 +418,7 @@ module.exports = {
     getHeroesByRarity,
     getHeroesByStatus, 
     heroesStamina ,
+    buyHeroes,
     heroesStartQuest ,
     heroesCompleteQuest
 };
