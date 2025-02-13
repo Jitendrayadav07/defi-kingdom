@@ -15,6 +15,12 @@ module.exports = (sequelize, Sequelize) => {
         email: {
             type: Sequelize.STRING
         },
+        telegram_username:{
+            type: Sequelize.STRING
+        },
+        telegram_chatid:{
+            type: Sequelize.STRING
+        },
         password: {
             type: Sequelize.STRING
         },

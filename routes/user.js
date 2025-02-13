@@ -16,7 +16,6 @@ router.post("/sign-in",
   userController.userSignIn
 );
 
-
 router.post('/forgot-password',
   JoiMiddleWare(userSchema.forgotPassword, "body"),
   userController.forgotPassword)
@@ -24,6 +23,11 @@ router.post('/forgot-password',
 router.get("/user-profiles-data", 
   userAuth,
   userController.getUserProfilesData);
+
+router.post('/telegram-verify',
+  userAuth,
+  userController.verifyTelegramUser
+)
 
 router.put("/telegram-username", 
     userAuth,

@@ -10,6 +10,9 @@ const USER_CONSTANTS_STATUS = {
     EMAIL_SENT : "You will receive a password reset link if the email address you provided is associated with an account",
     PASSWORD_RESET_SUCCESSFUL : "Password reset successfully",
     USER_NOT_FOUND: "User not found",
+    USER_VERIFIED: "User Verified Successfull",
+    USER_VERIFICATION_FAILIED: "User Verification Failed"
+
 };
   
 module.exports = USER_CONSTANTS_STATUS;

@@ -22,7 +22,7 @@ app.use(session({
 
 
 const corsOptions = {
-    origin: 'http://localhost:5173', // Update to match the frontend origin
+    origin: 'http://localhost:5175', // Update to match the frontend origin
     credentials: true, // Allow cookies to be sent
   };
 
@@ -36,7 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.use(function (req, res, next) {
-    const allowedOrigin = "http://localhost:5173"; // Update this to your frontend origin
+    const allowedOrigin = "http://localhost:5175"; // Update this to your frontend origin
     res.header("Access-Control-Allow-Origin", allowedOrigin);
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     res.header("Access-Control-Allow-Credentials", "true"); // Allow credentials

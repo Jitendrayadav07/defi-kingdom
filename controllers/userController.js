@@ -10,6 +10,7 @@ const sendEmail = require("../utils/sendEmail");
 const { ethers } = require("ethers");
 const contractABI = require("../classes/IProfilesABI.json");
 require("dotenv").config();
+const axios = require("axios");
 
 // Load environment variables
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
@@ -26,7 +27,6 @@ async function generateWallet() {
 
 async function createProfile(name, privateKey) {
   try {
-
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(privateKey, provider);
 
@@ -34,7 +34,6 @@ async function createProfile(name, privateKey) {
     // Replace with the correct ABI file
 
     const contract = new ethers.Contract(contractAddress, contractABI, wallet);
-
 
     // Call the function
     const tx = await contract.createProfile(name, 0, 0);
@@ -85,10 +84,21 @@ async function transferNativeToken(RECEIVER_ADDRESS) {
 
 const registerUser = async (req, res) => {
   try {
-    let user_data = await db.users.findOne({ where: { email: req.body.email } });
+    let user_data = await db.users.findOne({
+      where: { email: req.body.email },
+    });
 
     if (user_data)
-      return res.status(400).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_ALREADY_EXISTS, 400));
+      return res
+        .status(400)
+        .send(
+          Response.sendResponse(
+            false,
+            null,
+            USER_CONSTANTS.EMAIL_ALREADY_EXISTS,
+            400
+          )
+        );
 
     req.body.password = await bcrypt.hash(req.body.password, 10);
 
@@ -103,91 +113,148 @@ const registerUser = async (req, res) => {
 
     let user = await db.users.create(req.body);
 
-    const token = jwt.sign({ email: user.email }, JWT_SECRET, { expiresIn: "23h" });
+    const token = jwt.sign({ email: user.email }, JWT_SECRET, {
+      expiresIn: "23h",
+    });
 
     let emailData = {
       token: token,
       filePath: "../templates/userRegister.html",
-      subject: 'Verify Email',
-      name: user.name
+      subject: "Verify Email",
+      name: user.name,
     };
 
     await sendEmail(req.body.email, emailData.subject, emailData);
-    res.status(201).send(Response.sendResponse(true, user, USER_CONSTANTS.USER_CREATED, 201));
+    res
+      .status(201)
+      .send(
+        Response.sendResponse(true, user, USER_CONSTANTS.USER_CREATED, 201)
+      );
   } catch (err) {
-    console.log("errr", err)
+    console.log("errr", err);
     return res.status(500).send(Response.sendResponse(false, null, err, 500));
   }
-}
+};
 
 const userSignIn = async (req, res) => {
   try {
-    let user_data = await db.users.findOne({ where: { email: req.body.email } });
+    let user_data = await db.users.findOne({
+      where: { email: req.body.email },
+    });
 
     if (!user_data)
-      return res.status(404).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID, 404));
+      return res
+        .status(404)
+        .send(
+          Response.sendResponse(
+            false,
+            null,
+            USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID,
+            404
+          )
+        );
 
-    let passwordMatch = await bcrypt.compare(req.body.password, user_data.password);
+    let passwordMatch = await bcrypt.compare(
+      req.body.password,
+      user_data.password
+    );
 
     if (!passwordMatch)
-      return res.status(404).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID, 404));
+      return res
+        .status(404)
+        .send(
+          Response.sendResponse(
+            false,
+            null,
+            USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID,
+            404
+          )
+        );
 
     delete user_data.dataValues.password;
     delete user_data.dataValues.wallet_private_key;
     // JWT Token creation
-    const token = jwt.sign(
-      { email: user_data.email },
-      JWT_SECRET,
-      { expiresIn: "24h" }
-    );
+    const token = jwt.sign({ email: user_data.email }, JWT_SECRET, {
+      expiresIn: "24h",
+    });
     user_data.dataValues["token"] = token;
-    res.status(200).send(Response.sendResponse(true, user_data, USER_CONSTANTS.LOGIN_SUCCESSFUL, 200));
+    res
+      .status(200)
+      .send(
+        Response.sendResponse(
+          true,
+          user_data,
+          USER_CONSTANTS.LOGIN_SUCCESSFUL,
+          200
+        )
+      );
   } catch (err) {
-    console.log("err", err)
+    console.log("err", err);
     return res.status(500).send(Response.sendResponse(false, null, err, 500));
   }
 };
 
 const forgotPassword = async (req, res) => {
   try {
-    let { email } = req.body
+    let { email } = req.body;
 
     let user_data = await db.users.findOne({
       where: {
-        email: email
-      }
-    })
+        email: email,
+      },
+    });
 
     if (!user_data) {
-      return res.status(400).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID, 400));
+      return res
+        .status(400)
+        .send(
+          Response.sendResponse(
+            false,
+            null,
+            USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID,
+            400
+          )
+        );
     }
 
-    let userName = user_data.name
+    let userName = user_data.name;
 
     const token = jwt.sign({ email: email }, JWT_SECRET, { expiresIn: "5h" });
-    console.log("token", token)
     await sendForgetEmail(userName, "Password Reset Request", token, email);
 
-    return res.status(200).send(Response.sendResponse(true, null, USER_CONSTANTS.EMAIL_SENT, 200));
-
+    return res
+      .status(200)
+      .send(Response.sendResponse(true, null, USER_CONSTANTS.EMAIL_SENT, 200));
   } catch (error) {
     return res.status(500).send(Response.sendResponse(false, null, error, 500));
   }
-}
+};
 
 const setUserPassword = async (req, res) => {
   try {
-    let { token, password } = req.body
+    let { token, password } = req.body;
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    let user_data = await db.users.findOne({ where: { email: decoded.email } })
+    let user_data = await db.users.findOne({ where: { email: decoded.email } });
 
     if (!user_data) {
-      return res.status(400).send(Response.sendResponse(false, null, USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID, 400));
+      return res
+        .status(400)
+        .send(
+          Response.sendResponse(
+            false,
+            null,
+            USER_CONSTANTS.EMAIL_AND_PASSWORD_INVALID,
+            400
+          )
+        );
     } else {
-      password = await bcrypt.hash(password, 10)
+      password = await bcrypt.hash(password, 10);
 
-      let user_update = await db.users.update({ password: password }, { where: { email: decoded.email } })
+      let user_update = await db.users.update(
+        { password: password },
+        { where: { email: decoded.email } }
+      );
 
       return res
         .status(200)
@@ -207,29 +274,98 @@ const setUserPassword = async (req, res) => {
 
 const getUserProfilesData = async (req, res) => {
   try {
-    let user_data = await db.users.findOne({ where: { email: req.user.email }, attributes: { exclude: ['password', 'wallet_private_key'] } });
-    return res.status(200).send(Response.sendResponse(true, user_data, USER_CONSTANTS.USER_PROFILES, 200));
+    let user_data = await db.users.findOne({
+      where: { email: req.user.email },
+      attributes: { exclude: ["password", "wallet_private_key"] },
+    });
+
+    return res
+      .status(200)
+      .send(
+        Response.sendResponse(
+          true,
+          user_data,
+          USER_CONSTANTS.USER_PROFILES,
+          200
+        )
+      );
   } catch (error) {
     return res.status(500).send(Response.sendResponse(false, null, error, 500));
   }
-}
+};
 
 const updateTelegramUsername = async (req, res) => {
   try {
-    let { telegram_username , id  } = req.body
-    let user_data = await db.users.findOne({ where: { id: id } })
-    
-    if (!user_data) {
-      return res.status(400).send(Response.sendResponse(false, null, USER_CONSTANTS.USER_NOT_FOUND, 400));
-    } 
+    let { telegram_username, id } = req.body;
+    let user_data = await db.users.findOne({ where: { id: id } });
 
-    let user_update = await db.users.update({ telegram_username: telegram_username }, { where: { email: req.user.email } })
-    return res.status(200).send(Response.sendResponse(true,user_update,USER_CONSTANTS.USER_UPDATED,200));
-    
+    if (!user_data) {
+      return res
+        .status(400)
+        .send(
+          Response.sendResponse(false, null, USER_CONSTANTS.USER_NOT_FOUND, 400)
+        );
+    }
+
+    let user_update = await db.users.update(
+      { telegram_username: telegram_username },
+      { where: { email: req.user.email } }
+    );
+    return res
+      .status(200)
+      .send(
+        Response.sendResponse(
+          true,
+          user_update,
+          USER_CONSTANTS.USER_UPDATED,
+          200
+        )
+      );
   } catch (error) {
     return res.status(500).send(Response.sendResponse(false, null, error, 500));
   }
-}
+};
+
+const verifyTelegramUser = async (req, res) => {
+  try {
+    const { telegramId } = req.body;
+
+    if (!telegramId) {
+      return res.status(400).json({ message: "Telegram ID is required" });
+    }
+    const response = await axios.get(process.env.TELEGRAM_GET_CHATID_API_URL);
+    
+    if (!response.data.ok) {
+      return res
+        .status(500)
+        .json(Response.sendResponse(false, null, "Failed to fetch Telegram updates", 500));
+    }
+    const messages = response.data.result;   
+   
+    const userMessage = messages.find(
+      (update) =>
+        update.message?.from?.username && 
+        update.message.from.username.toLowerCase() === telegramId.toLowerCase()
+    );
+   
+    if (!userMessage) {
+      return res.status(200).json(Response.sendResponse(true, null, USER_CONSTANTS.USER_VERIFICATION_FAILIED, 200));
+    }
+
+    const chatId = userMessage.message.chat.id;
+    const user = await db.users.findOne({ where: { email:req.user.email,telegram_username:telegramId } });
+
+    if (user) {
+      await db.users.update({ telegram_chatid:chatId }, { where: { email:req.user.email, telegram_username:telegramId } });
+
+      return res.status(200).json(Response.sendResponse(true, null, USER_CONSTANTS.USER_VERIFIED, 200));
+    } else {
+      return res.status(200).json(Response.sendResponse(true, null, USER_CONSTANTS.USER_VERIFICATION_FAILIED, 200));
+    }
+  } catch (error) {
+    return res.status(500).send(Response.sendResponse(false, null, error.message, 500));
+  }
+};
 
 module.exports = {
   registerUser,
@@ -237,5 +373,6 @@ module.exports = {
   forgotPassword,
   setUserPassword,
   getUserProfilesData,
-  updateTelegramUsername
-}
+  updateTelegramUsername,
+  verifyTelegramUser,
+};
