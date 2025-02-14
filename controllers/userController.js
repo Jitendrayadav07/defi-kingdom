@@ -334,35 +334,35 @@ const verifyTelegramUser = async (req, res) => {
       return res.status(400).json({ message: "Telegram ID is required" });
     }
     const response = await axios.get(process.env.TELEGRAM_GET_CHATID_API_URL);
-    
+
     if (!response.data.ok) {
       return res
         .status(500)
         .json(Response.sendResponse(false, null, "Failed to fetch Telegram updates", 500));
     }
-    const messages = response.data.result;   
+    const messages = response.data.result;
 
     if (messages.length === 0) {
       return res
-          .status(500)
-          .json(Response.sendResponse(false, null, "Something went wrong Please check in sometime", 500));
+        .status(500)
+        .json(Response.sendResponse(false, null, "Something went wrong Please check in sometime", 500));
     }
-   
+
     const userMessage = messages.find(
       (update) =>
-        update.message?.from?.username && 
+        update.message?.from?.username &&
         update.message.from.username.toLowerCase() === telegramId.toLowerCase()
     );
-   
+
     if (!userMessage) {
       return res.status(200).json(Response.sendResponse(true, null, USER_CONSTANTS.USER_VERIFICATION_FAILIED, 200));
     }
 
     const chatId = userMessage.message.chat.id;
-    const user = await db.users.findOne({ where: { email:req.user.email,telegram_username:telegramId } });
+    const user = await db.users.findOne({ where: { email: req.user.email, telegram_username: telegramId } });
 
     if (user) {
-      await db.users.update({ telegram_chatid:chatId }, { where: { email:req.user.email, telegram_username:telegramId } });
+      await db.users.update({ telegram_chatid: chatId }, { where: { email: req.user.email, telegram_username: telegramId } });
 
       return res.status(200).json(Response.sendResponse(true, null, USER_CONSTANTS.USER_VERIFIED, 200));
     } else {
@@ -374,7 +374,18 @@ const verifyTelegramUser = async (req, res) => {
 };
 
 const getUserActivity = async (req, res) => {
+  try {
 
+    let userActivity = await db.sequelize.query(`SELECT ua.*,us.name FROM user_activity ua INNER JOIN users us ON us.id = ua.user_id WHERE us.email = :emailId Order By id desc`, {
+      type: QueryTypes.SELECT,
+      replacements: { emailId: req.user.email },
+    });
+
+    return res.status(200).json(Response.sendResponse(true, userActivity, USER_CONSTANTS.SUCCESS, 200));
+
+  } catch (error) {
+    return res.status(500).send(Response.sendResponse(false, null, error.message, 500));
+  }
 }
 
 module.exports = {
@@ -385,4 +396,5 @@ module.exports = {
   getUserProfilesData,
   updateTelegramUsername,
   verifyTelegramUser,
+  getUserActivity
 };

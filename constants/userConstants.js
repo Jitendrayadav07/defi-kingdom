@@ -11,7 +11,8 @@ const USER_CONSTANTS_STATUS = {
     PASSWORD_RESET_SUCCESSFUL : "Password reset successfully",
     USER_NOT_FOUND: "User not found",
     USER_VERIFIED: "User Verified Successfull",
-    USER_VERIFICATION_FAILIED: "User Verification Failed"
+    USER_VERIFICATION_FAILIED: "User Verification Failed",
+    SUCCESS: "Data fetched successfully",
 
 };
   

@@ -171,7 +171,6 @@ const aiAgentAction = async (req, res) => {
     try {
         let { action } = req.body;
         action = action?.toLowerCase();
-
         switch (action) {
             case "swap":
                 return swapTokens(req, res);
@@ -223,9 +222,9 @@ async function swapTokens(req, res) {
                 if (swap_data.status) {
                     await userActivityLogger.logActivity(req, user.id, "Swap AVAX -> JEWEL", swap_data.transaction_hash);
 
-                    return res.status(200).send(Response.sendResponse(true, swap_data.message, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, null, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, swap_data.message, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, null, 400));
                 }
 
                 break;
@@ -241,9 +240,9 @@ async function swapTokens(req, res) {
                 if (swap_data.status) {
                     await userActivityLogger.logActivity(req, user.id, "Swap JEWEL -> AVAX", swap_data.transaction_hash);
 
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, null, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, null, 400));
                 }
                 break;
 
@@ -257,9 +256,9 @@ async function swapTokens(req, res) {
 
                 if (swap_data.status) {
                     await userActivityLogger.logActivity(req, user.id, "Swap AVAX -> CRYSTAL", swap_data.transaction_hash);
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, null, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, null, 400));
                 }
                 break;
 
@@ -273,9 +272,9 @@ async function swapTokens(req, res) {
 
                 if (swap_data.status) {
                     await userActivityLogger.logActivity(req, user.id, "Swap CRYSTAL -> AVAX", swap_data.transaction_hash);
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, null, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, null, 400));
                 }
                 break;
 
@@ -289,9 +288,9 @@ async function swapTokens(req, res) {
 
                 if (swap_data.status) {
                     await userActivityLogger.logActivity(req, user.id, "Swap JEWEL -> CRYSTAL", swap_data.transaction_hash);
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, null, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, null, 400));
                 }
                 break;
 
@@ -304,9 +303,9 @@ async function swapTokens(req, res) {
 
                 if (swap_data.status) {
                     await userActivityLogger.logActivity(req, user.id, "Swap CRYSTAL -> JEWEL", swap_data.transaction_hash);
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, null, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, swap_data.message, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, null, 400));
                 }
 
                 break;

@@ -161,7 +161,6 @@ const buyHeroes = async (req, res) => {
 
         // Get the current required bid price
         const currentPrice = await contract.getCurrentPrice(hero_id);
-        console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
 
         const crystalAmountBN = currentPrice//ethers.toBigInt(amount);
 
@@ -169,9 +168,7 @@ const buyHeroes = async (req, res) => {
         const tx = await contract.bid(hero_id, crystalAmountBN);
 
         // Wait for confirmation
-        const receipt = await tx.wait();
-        console.log("Transaction confirmed:", receipt);
-
+        await tx.wait();
 
         const heroData = await getHeroesNetworkById(hero_id);
         // console.log("heroData",heroData);
@@ -189,15 +186,46 @@ const buyHeroes = async (req, res) => {
 const heroesStartQuest = async (req, res) => {
     try {
         const user = await fetchUserByEmail(req.user.email);
+
+        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
+        const wallet = new ethers.Wallet(user.wallet_private_key, provider);
+        const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
+
         const data = await HeroesService.getHeroesByOwner(user.wallet_address);
+
         if (!data.heroes || data.heroes.length === 0) {
             return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
 
-        const hero_id = data.heroes[2].id
-        const skeleton = await fetchHeroSkeleton(hero_id);
+        let hero_id = 0;
 
-        let hero_formated_data = await formatHeroData(data.heroes[0], skeleton);
+        for (let i = 0; i < data.heroes.length; i++) {
+            hero_id = data.heroes[i].id
+    
+            let heroes_quest = await contract.getHeroQuest(hero_id);
+            let questStatus = Number(heroes_quest[9]);
+
+            const QuestStatus = {
+                NONE: 0,
+                STARTED: 1,
+                COMPLETED: 2,
+                CANCELED: 3,
+                EXPEDITION: 4
+            };
+
+            let hero_status = await fetchAndFormatHeroData(data.heroes[i])
+            
+            if (!(questStatus === QuestStatus.STARTED || questStatus === QuestStatus.EXPEDITION)
+                && hero_status.on_sale === false) {
+                break;
+            }
+
+        }
+
+        if (!hero_id) {
+            return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
+        }
+
         let stamina = await getHeroeStamina(hero_id);
 
         if (stamina < 7) {
@@ -205,24 +233,6 @@ const heroesStartQuest = async (req, res) => {
         }
 
         let heroIds = Array.isArray(hero_id) ? hero_id : [hero_id];
-
-        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
-        const wallet = new ethers.Wallet(user.wallet_private_key, provider);
-        const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
-        let heroes_quest = await contract.getHeroQuest(hero_id);
-        let questStatus = Number(heroes_quest[9]);
-
-        const QuestStatus = {
-            NONE: 0,
-            STARTED: 1,
-            COMPLETED: 2,
-            CANCELED: 3,
-            EXPEDITION: 4
-        };
-
-        if (questStatus === QuestStatus.STARTED || questStatus === QuestStatus.EXPEDITION) {
-            return res.status(400).send(Response.sendResponse(false, null, "Hero is already on an active quest", 400));
-        }
 
         const attempts = 1;
         const level = 0;
