@@ -5,11 +5,13 @@ const TOKEN_CONSTANTS = require("../constants/tokenConstants");
 const db = require("../config/db.config");
 const axios = require('axios');
 const { ethers } = require("ethers");
-const RPC_URL = TOKEN_CONSTANTS.DFK_RPC_URL;
 const QUEST_CORE_CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752"; // Mainnet QuestCoreV3 contract address
 const { fetchAndFormatHeroData } = require('../services/heroUtils');
 const { fetchUserByEmail } = require('../services/getUserData');
 const { fetchUserByWalletAddress } = require('../services/getUserData');
+
+const UserActivityLogger = require('../classes/userActivity');
+const userActivityLogger = new UserActivityLogger(db);
 
 const QUEST_ABI = [
     "function getHeroQuest(uint256 heroId) view returns (tuple(uint256 id, uint256 questInstanceId, uint8 level, uint256[] heroes, address player, uint256 startBlock, uint256 startAtTime, uint256 completeAtTime, uint8 attempts, uint8 status, uint8 questType))",
@@ -63,7 +65,7 @@ async function getHeroesNetworkById(hero_id) {
 
 const getSelectedHeroId = async () => {
     const heroApiUrl = "https://api.defikingdoms.com/heroes";
-    
+
     const filterParams = {
         flatten: true,
         limit: 4,
@@ -85,12 +87,12 @@ const getSelectedHeroId = async () => {
             headers: { "Content-Type": "application/json" },
         });
         const heroIds = heroResponse.data.map(hero => hero[0]);
-        const selectedHeroId = heroIds[1]; 
+        const selectedHeroId = heroIds[1];
 
         return selectedHeroId;
     } catch (error) {
         console.error("Error fetching hero data:", error);
-        return null; 
+        return null;
     }
 };
 
@@ -100,7 +102,7 @@ const heroesStamina = async (req, res) => {
 
         const CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752";
 
-        const ABI = [   
+        const ABI = [
             "function getCurrentStamina(uint256 _heroId) view returns (uint256)",
         ];
 
@@ -126,7 +128,7 @@ const heroesStamina = async (req, res) => {
 
 async function getHeroeStamina(heroId) {
     const CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752";
-    const ABI = [   
+    const ABI = [
         "function getCurrentStamina(uint256 _heroId) view returns (uint256)",
     ];
 
@@ -137,7 +139,7 @@ async function getHeroeStamina(heroId) {
     return stamina;
 }
 
-const buyHeroes = async (req, res) =>{
+const buyHeroes = async (req, res) => {
     try {
         const hero_id = await getSelectedHeroId();
 
@@ -157,9 +159,9 @@ const buyHeroes = async (req, res) =>{
         const wallet = new ethers.Wallet(privateKey, provider);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
-         // Get the current required bid price
-         const currentPrice = await contract.getCurrentPrice(hero_id);
-         console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
+        // Get the current required bid price
+        const currentPrice = await contract.getCurrentPrice(hero_id);
+        console.log(`Current price for NFT ${hero_id}:`, ethers.formatUnits(currentPrice, 18), "CRYSTAL");
 
         const crystalAmountBN = currentPrice//ethers.toBigInt(amount);
 
@@ -170,9 +172,12 @@ const buyHeroes = async (req, res) =>{
         const receipt = await tx.wait();
         console.log("Transaction confirmed:", receipt);
 
-       
+
         const heroData = await getHeroesNetworkById(hero_id);
         // console.log("heroData",heroData);
+
+        await userActivityLogger.logActivity(req, user.id, `Hero Bought`, tx.hash);
+
         return res.status(200).send(Response.sendResponse(true, heroData, HEROES_CONSTANTS_STATUS.HEROES_BOUGHT, 200));
 
     } catch (error) {
@@ -189,15 +194,13 @@ const heroesStartQuest = async (req, res) => {
             return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
 
-        const hero_id = data.heroes[1].id
-        console.log("hero_id",hero_id);
+        const hero_id = data.heroes[2].id
         const skeleton = await fetchHeroSkeleton(hero_id);
 
         let hero_formated_data = await formatHeroData(data.heroes[0], skeleton);
-        console.log("hero_formated_data",hero_formated_data);
         let stamina = await getHeroeStamina(hero_id);
-  
-        if(stamina < 7){
+
+        if (stamina < 7) {
             return res.status(400).send(Response.sendResponse(false, null, "Hero stamina is not enough", 400));
         }
 
@@ -216,7 +219,7 @@ const heroesStartQuest = async (req, res) => {
             CANCELED: 3,
             EXPEDITION: 4
         };
- 
+
         if (questStatus === QuestStatus.STARTED || questStatus === QuestStatus.EXPEDITION) {
             return res.status(400).send(Response.sendResponse(false, null, "Hero is already on an active quest", 400));
         }
@@ -224,9 +227,9 @@ const heroesStartQuest = async (req, res) => {
         const attempts = 1;
         const level = 0;
         const questTypeId = 0;
-        const questInstanceId = 1; 
+        const questInstanceId = 1;
 
-        const tx = await contract.startQuest(heroIds, questInstanceId, attempts, level, questTypeId )
+        const tx = await contract.startQuest(heroIds, questInstanceId, attempts, level, questTypeId)
         const receipt = await tx.wait();
         console.log("Transaction confirmed in block:", receipt.blockNumber);
 
@@ -247,10 +250,15 @@ const heroesStartQuest = async (req, res) => {
         // update hero telegram
         await db.hero_quests.create(questData);
 
-        await axios.post(process.env.TELEGRAM_API_URL, {
-            chat_id: user.telegram_chatid,
-            text: "Hero is been started on Quest please login and check your Defi kingdom portal for more info",
-        });
+        await userActivityLogger.logActivity(req, user.id, `Quest Started`, tx.hash);
+
+        if (user.telegram_chatid) {
+            await axios.post(process.env.TELEGRAM_API_URL, {
+                chat_id: user.telegram_chatid,
+                text: "Hero is been started on Quest please login and check your Defi kingdom portal for more info",
+            });
+        }
+
         return res.status(200).send(Response.sendResponse(true, receipt, "Quest started successfully", 200));
     } catch (error) {
         // console.error("Error starting quest:", error);
@@ -269,11 +277,10 @@ const runQuestCheck = async () => {
         });
 
         if (quest) {
-            const currentTimestamp = Math.floor(Date.now() / 1000); 
-            console.log("currentTimestamp",currentTimestamp);
+            const currentTimestamp = Math.floor(Date.now() / 1000);
             if (currentTimestamp >= quest.end_time) {
                 console.log(`Quest for hero ${quest.hero_id} has ended. Completing quest...`);
-                await heroesCompleteQuest(quest.hero_id,quest.wallet_address);
+                await heroesCompleteQuest(quest.hero_id, quest.wallet_address);
             }
         } else {
             console.log('No quest found or quest is not started yet.');
@@ -285,16 +292,16 @@ const runQuestCheck = async () => {
 
 const startCronJob = async () => {
     while (true) {
-        await runQuestCheck(); 
+        await runQuestCheck();
         console.log('Waiting for 20 seconds before next check...');
-        await sleep(5000); 
+        await sleep(5000);
     }
 };
 
 // startCronJob();
 
 
-const heroesCompleteQuest = async (hero_id,wallet_address) => {
+const heroesCompleteQuest = async (hero_id, wallet_address) => {
     try {
         const user = await fetchUserByWalletAddress(wallet_address);
         const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
@@ -322,7 +329,7 @@ const heroesCompleteQuest = async (hero_id,wallet_address) => {
 const sellheroesQuest = async (req, res) => {
     try {
         const { hero_id, startingPrice, endingPrice, duration } = req.body;
-    
+
         if (!hero_id || !startingPrice || !endingPrice || !duration) {
             return res.status(500).send(Response.sendResponse(false, null, "Missing required parameters", 400));
         }
@@ -338,27 +345,27 @@ const sellheroesQuest = async (req, res) => {
         const wallet = new ethers.Wallet(user.wallet_private_key, provider);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
-        const startingPriceBN = ethers.parseUnits(startingPrice.toString(), 18); 
-        const endingPriceBN = ethers.parseUnits(endingPrice.toString(), 18); 
-        const durationBN = BigInt(duration); 
-        const tx = await contract.createAuction(hero_id,startingPriceBN,endingPriceBN,durationBN,ethers.ZeroAddress );
+        const startingPriceBN = ethers.parseUnits(startingPrice.toString(), 18);
+        const endingPriceBN = ethers.parseUnits(endingPrice.toString(), 18);
+        const durationBN = BigInt(duration);
+        const tx = await contract.createAuction(hero_id, startingPriceBN, endingPriceBN, durationBN, ethers.ZeroAddress);
 
         console.log("Transaction sent:", tx);
 
         const receipt = await tx.wait();
 
-        return res.status(200).send({success: true,data: receipt,message: "Hero listed for auction successfully"});
+        return res.status(200).send({ success: true, data: receipt, message: "Hero listed for auction successfully" });
     } catch (error) {
         console.error("Error in sellHero API:", error);
-        return res.status(500).send({success: false,message: "An error occurred while listing the hero for auction",error: error.message});
+        return res.status(500).send({ success: false, message: "An error occurred while listing the hero for auction", error: error.message });
     }
 };
 
 module.exports = {
     getOwnerHeroesByAddress,
-    heroesStamina ,
+    heroesStamina,
     buyHeroes,
-    heroesStartQuest ,
+    heroesStartQuest,
     heroesCompleteQuest,
     sellheroesQuest,
 };
