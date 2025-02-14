@@ -72,7 +72,8 @@ const formatHeroData = async (hero, skeleton) => {
         intelligenceGrowthS: hero.intelligenceGrowthS / 100,
         wisdomGrowthS: hero.wisdomGrowthS / 100,
         luckGrowthS: hero.luckGrowthS / 100,
-        currentQuest : hero.currentQuest
+        currentQuest : hero.currentQuest,
+        on_sale: !!hero.saleAuction,
     };
 };
 

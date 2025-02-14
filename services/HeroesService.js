@@ -60,7 +60,7 @@ class HeroesService {
             strengthGrowthP dexterityGrowthP agilityGrowthP vitalityGrowthP enduranceGrowthP 
             intelligenceGrowthP wisdomGrowthP luckGrowthP 
             strengthGrowthS dexterityGrowthS agilityGrowthS vitalityGrowthS enduranceGrowthS 
-            intelligenceGrowthS wisdomGrowthS luckGrowthS currentQuest
+            intelligenceGrowthS wisdomGrowthS luckGrowthS currentQuest saleAuction { id }
         `;
     }
 }
