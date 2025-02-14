@@ -10,30 +10,10 @@ router.get("/owner-heroes",
     heroesController.getOwnerHeroesByAddress
 );
 
-router.get("/heroes-network", 
-    JoiMiddleWare(heroesValidationSchema.getHeroesNetworkByIdSchema, "query"),
-    heroesController.getHeroesNetworkById
-);
-
-router.get("/heroes-rarity", 
-    JoiMiddleWare(heroesValidationSchema.getHeroesByRaritySchema, "query"),
-    heroesController.getHeroesByRarity
-);
-
-router.get("/heroes-status", 
-    JoiMiddleWare(heroesValidationSchema.getHeroesByStatusSchema, "query"),
-    heroesController.getHeroesByStatus
-);
-
 router.get("/heroes-stamina", 
     userAuth,
     JoiMiddleWare(heroesValidationSchema.getHeroesNetworkByIdSchema, "query"),
     heroesController.heroesStamina
-);
-
-router.post("/heroes-start-quest", 
-    userAuth,
-    heroesController.heroesStartQuest
 );
 
 router.post("/heroes-completed-quest", 

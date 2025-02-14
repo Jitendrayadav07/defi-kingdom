@@ -341,6 +341,12 @@ const verifyTelegramUser = async (req, res) => {
         .json(Response.sendResponse(false, null, "Failed to fetch Telegram updates", 500));
     }
     const messages = response.data.result;   
+
+    if (messages.length === 0) {
+      return res
+          .status(500)
+          .json(Response.sendResponse(false, null, "Something went wrong Please check in sometime", 500));
+    }
    
     const userMessage = messages.find(
       (update) =>
