@@ -6,6 +6,9 @@ const TOKEN_CONSTANTS = require("../constants/tokenConstants");
 const { ethers } = require("ethers");
 require("dotenv").config();
 const heroesController = require('./heroesController');
+const UserActivityLogger = require('../classes/userActivity');
+const userActivityLogger = new UserActivityLogger(db);
+
 
 const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
 const routerAddress = TOKEN_CONSTANTS.ROUTER_ADDRESS;
@@ -53,6 +56,7 @@ async function tokenToNative(amount, wallet, path, from) {
 
         let response = {
             status: true,
+            transaction_hash: tx.hash,
             message: "Swap complete!"
         }
         return response;
@@ -96,6 +100,7 @@ async function nativeToToken(amount, wallet, path) {
 
         let response = {
             status: true,
+            transaction_hash: tx.hash,
             message: "Swap complete!"
         }
 
@@ -146,6 +151,7 @@ async function tokenToToken(amount, wallet, from, path) {
 
         let response = {
             status: true,
+            transaction_hash: tx.hash,
             message: "Swap complete!"
         }
 
@@ -215,9 +221,11 @@ async function swapTokens(req, res) {
                 swap_data = await tokenToNative(amount, wallet, path, AVAX);
 
                 if (swap_data.status) {
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    await userActivityLogger.logActivity(req, user.id, "Swap AVAX -> JEWEL", swap_data.transaction_hash);
+
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, swap_data.message, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, swap_data.message, 400));
                 }
 
                 break;
@@ -231,6 +239,8 @@ async function swapTokens(req, res) {
                 swap_data = await nativeToToken(amount, wallet, path);
 
                 if (swap_data.status) {
+                    await userActivityLogger.logActivity(req, user.id, "Swap JEWEL -> AVAX", swap_data.transaction_hash);
+
                     return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
                 } else {
                     return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
@@ -246,6 +256,7 @@ async function swapTokens(req, res) {
                 swap_data = await tokenToToken(amount, wallet, AVAX, path);
 
                 if (swap_data.status) {
+                    await userActivityLogger.logActivity(req, user.id, "Swap AVAX -> CRYSTAL", swap_data.transaction_hash);
                     return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
                 } else {
                     return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
@@ -261,6 +272,7 @@ async function swapTokens(req, res) {
                 swap_data = await tokenToToken(amount, wallet, CRYSTAL, path);
 
                 if (swap_data.status) {
+                    await userActivityLogger.logActivity(req, user.id, "Swap CRYSTAL -> AVAX", swap_data.transaction_hash);
                     return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
                 } else {
                     return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
@@ -276,6 +288,7 @@ async function swapTokens(req, res) {
                 swap_data = await nativeToToken(amount, wallet, path);
 
                 if (swap_data.status) {
+                    await userActivityLogger.logActivity(req, user.id, "Swap JEWEL -> CRYSTAL", swap_data.transaction_hash);
                     return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
                 } else {
                     return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
@@ -290,7 +303,8 @@ async function swapTokens(req, res) {
                 swap_data = await tokenToNative(amount, wallet, path, CRYSTAL);
 
                 if (swap_data.status) {
-                    return res.status(200).send(Response.sendResponse(true, swap_data.message, swap_data.message, 200));
+                    await userActivityLogger.logActivity(req, user.id, "Swap CRYSTAL -> JEWEL", swap_data.transaction_hash);
+                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
                 } else {
                     return res.status(400).send(Response.sendResponse(false, swap_data.message, swap_data.message, 400));
                 }
@@ -330,7 +344,9 @@ const withdrawFunds = async (req, res) => {
         const receipt = await tx.wait();
         console.log("Transaction confirmed in block:", receipt.blockNumber);
 
-        res.status(200).send(Response.sendResponse(true, null, "Transaction confirmed in block: " + receipt.blockNumber, 200));
+        await userActivityLogger.logActivity(req, user.id, `Withdraw Funds worth ${req.body.amount}`, tx.hash);
+
+        return res.status(200).send(Response.sendResponse(true, null, "Transaction confirmed in block: " + receipt.blockNumber, 200));
 
     } catch (error) {
         console.log("errr", error)

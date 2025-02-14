@@ -373,6 +373,10 @@ const verifyTelegramUser = async (req, res) => {
   }
 };
 
+const getUserActivity = async (req, res) => {
+
+}
+
 module.exports = {
   registerUser,
   userSignIn,
