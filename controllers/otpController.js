@@ -7,16 +7,19 @@ const OTPCONSTANT = require("../constants/otpConstants");
 function generateOTP() {
     const otp = speakeasy.totp({
         secret: 'secret_key',  // Use a secure key in production
-        encoding: 'base32'
+        encoding: 'base32',
+        step: 1200,
+        digits: 6
     });
     return otp;
 }
 
-function verifyOTP(token) {
+function verifyOTP(otp, secret) {
     const verified = speakeasy.totp.verify({
-        secret: 'secret_key', 
+        secret: secret,
         encoding: 'base32',
-        token: token,
+        token: otp,
+        step: 1200, 
         window: 1
     });
     return verified;
@@ -69,7 +72,9 @@ const verifyOTPEmail = async (req, res) => {
             return res.status(status).send(Response.sendResponse(false, null, error, status));
         }
 
-        const isVerified = verifyOTP(otp);
+        const secret = 'secret_key';
+
+        const isVerified = verifyOTP(otp, secret);
         if (isVerified) {
             return res.status(200).send(Response.sendResponse(true, user_data, OTPCONSTANT.OTP_SUCCESS, 200));
         } else {

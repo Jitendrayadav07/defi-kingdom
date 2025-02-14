@@ -5,7 +5,11 @@ const tokenValidationSchema = {
         amount: Joi.string(),
         from: Joi.string(),
         to: Joi.string(),
-        action : Joi.string().required()
+        action : Joi.string().required(),
+        hero_id: Joi.number(),
+        startingPrice: Joi.number().positive(),
+        endingPrice: Joi.number().positive(), 
+        duration: Joi.number().integer().positive() 
     }),
     withdrawFunds: Joi.object().keys({
         amount: Joi.string().required(),

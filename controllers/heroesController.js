@@ -7,76 +7,15 @@ const axios = require('axios');
 const { ethers } = require("ethers");
 const RPC_URL = TOKEN_CONSTANTS.DFK_RPC_URL;
 const QUEST_CORE_CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752"; // Mainnet QuestCoreV3 contract address
-const FISHING_QUEST_ADDRESS = "0x08BDdaB7d681c6406fE61d261c26Da80678874f6";  // Mainnet Fishing Quest contract address
-const FORAGING_QUEST_ADDRESS = "0x08BDdaB7d681c6406fE61d261c26Da80678874f6"; // Mainnet Foraging Quest contract address
+const { fetchAndFormatHeroData } = require('../services/heroUtils');
+const { fetchUserByEmail } = require('../services/getUserData');
+const { fetchUserByWalletAddress } = require('../services/getUserData');
 
 const QUEST_ABI = [
     "function getHeroQuest(uint256 heroId) view returns (tuple(uint256 id, uint256 questInstanceId, uint8 level, uint256[] heroes, address player, uint256 startBlock, uint256 startAtTime, uint256 completeAtTime, uint8 attempts, uint8 status, uint8 questType))",
     "function startQuest(uint256[] _heroIds, uint256 _questInstanceId, uint8 _attempts, uint8 _level, uint8 _type)",
     "function completeQuest(uint256 _heroId)",
 ];
-
-const fetchHeroSkeleton = async (heroId) => {
-    const url = `https://heroes.defikingdoms.com/token/${heroId}`;
-    try {
-        const response = await axios.get(url);
-        return response.data;
-    } catch (error) {
-        console.error(`Failed to fetch skeleton for heroId: ${heroId}`, error);
-        return null;
-    }
-};
-
-const formatHeroData = async (hero, skeleton) => {
-    return {
-        id: skeleton?.heroData?.id || hero.id,
-        image: skeleton?.image || null,
-        name: skeleton?.name || `${hero.firstName} ${hero.lastName}`,
-        male: hero.gender,
-        subclass: hero.subClassStr,
-        rarity: hero.rarity,
-        level: hero.level,
-        generation: hero.generation,
-        element: hero.element,
-        background: hero.background,
-        stamina: hero.stamina,
-        staminaFullAt : hero.staminaFullAt,
-        summons: hero.summons,
-        xp: hero.xp,
-        hp: hero.hp,
-        mp: hero.mp,
-        class: hero.mainClassStr,
-        strength: hero.strength,
-        dexterity: hero.dexterity,
-        agility: hero.agility,
-        vitality: hero.vitality,
-        endurance: hero.endurance,
-        intelligence: hero.intelligence,
-        wisdom: hero.wisdom,
-        luck: hero.luck,
-        mining: hero.mining / 10,
-        gardening: hero.gardening / 10,
-        foraging: hero.foraging / 10,
-        fishing: hero.fishing / 10,
-        strengthGrowthP: hero.strengthGrowthP / 100,
-        dexterityGrowthP: hero.dexterityGrowthP / 100,
-        agilityGrowthP: hero.agilityGrowthP / 100,
-        vitalityGrowthP: hero.vitalityGrowthP / 100,
-        enduranceGrowthP: hero.enduranceGrowthP / 100,
-        intelligenceGrowthP: hero.intelligenceGrowthP / 100,
-        wisdomGrowthP: hero.wisdomGrowthP / 100,
-        luckGrowthP: hero.luckGrowthP / 100,
-        strengthGrowthS: hero.strengthGrowthS / 100,
-        dexterityGrowthS: hero.dexterityGrowthS / 100,
-        agilityGrowthS: hero.agilityGrowthS / 100,
-        vitalityGrowthS: hero.vitalityGrowthS / 100,
-        enduranceGrowthS: hero.enduranceGrowthS / 100,
-        intelligenceGrowthS: hero.intelligenceGrowthS / 100,
-        wisdomGrowthS: hero.wisdomGrowthS / 100,
-        luckGrowthS: hero.luckGrowthS / 100,
-        currentQuest : hero.currentQuest
-    };
-};
 
 const getOwnerHeroesByAddress = async (req, res) => {
     try {
@@ -90,11 +29,7 @@ const getOwnerHeroesByAddress = async (req, res) => {
             return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
 
-        const heroPromises = data.heroes.map(async (hero) => {
-            const skeleton = await fetchHeroSkeleton(hero.id);
-            return formatHeroData(hero, skeleton);
-        });
-
+        const heroPromises = data.heroes.map(hero => fetchAndFormatHeroData(hero));
         const heroesWithFilteredData = (await Promise.all(heroPromises)).filter(Boolean);
 
         return res.status(200).send(Response.sendResponse(true, heroesWithFilteredData, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
@@ -103,9 +38,9 @@ const getOwnerHeroesByAddress = async (req, res) => {
     }
 };
 
-const getHeroesNetworkById = async (req, res) => {
+async function getHeroesNetworkById(hero_id) {
     try {
-        const id = req.query.id;
+        const id = hero_id;
         if (!id) {
             return res.status(400).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 400));
         }
@@ -116,40 +51,15 @@ const getHeroesNetworkById = async (req, res) => {
         }
 
         const hero = data.heroes[0];
-        const skeleton = await fetchHeroSkeleton(hero.id);
-        const formattedHero = formatHeroData(hero, skeleton);
 
-        return res.status(200).send(Response.sendResponse(true, formattedHero, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
+        const formattedHero = await fetchAndFormatHeroData(hero);
+        return formattedHero
     } catch (error) {
+        // console.log("Error fetching hero data:", error);
         return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
     }
 };
 
-const getHeroesByRarity = async (req, res) => {
-    try {
-        const rarity = req.query.rarity;
-        if (!rarity) {
-            return res.status(400).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 400));
-        }
-
-        const data = await HeroesService.getHeroesByRarity(rarity);
-        return res.status(200).send(Response.sendResponse(true, data.heroes, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
-    } catch (error) {
-        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
-    }
-};
-
-const getHeroesByStatus = async (req, res) => {
-    try {
-        const owner = req.query.owner;
-        const pjStatus = req.query.pjStatus;
-
-        const data = await HeroesService.getHeroesByStatus(owner, pjStatus);
-        return res.status(200).send(Response.sendResponse(true, data.heroes, HEROES_CONSTANTS_STATUS.HEROES_FETCHED, 200));
-    } catch (error) {
-        return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
-    }
-};
 
 const getSelectedHeroId = async () => {
     const heroApiUrl = "https://api.defikingdoms.com/heroes";
@@ -186,11 +96,7 @@ const getSelectedHeroId = async () => {
 
 const heroesStamina = async (req, res) => {
     try {
-        let user = await db.users.findOne({
-            where: {
-                email: req.user.email
-            }
-        });
+        const user = await fetchUserByEmail(req.user.email);
 
         const CONTRACT_ADDRESS = "0x530fff22987E137e7C8D2aDcC4c15eb45b4FA752";
 
@@ -234,11 +140,8 @@ async function getHeroeStamina(heroId) {
 const buyHeroes = async (req, res) =>{
     try {
         const hero_id = await getSelectedHeroId();
-        let user = await db.users.findOne({
-            where: {
-                email: req.user.email
-            }
-        });
+
+        const user = await fetchUserByEmail(req.user.email);
 
         // Contract details
         const CONTRACT_ADDRESS = "0xc390fAA4C7f66E4D62E59C231D5beD32Ff77BEf0";
@@ -267,7 +170,10 @@ const buyHeroes = async (req, res) =>{
         const receipt = await tx.wait();
         console.log("Transaction confirmed:", receipt);
 
-        return res.status(200).send(Response.sendResponse(true, null, HEROES_CONSTANTS_STATUS.HEROES_BOUGHT, 200));
+       
+        const heroData = await getHeroesNetworkById(hero_id);
+        // console.log("heroData",heroData);
+        return res.status(200).send(Response.sendResponse(true, heroData, HEROES_CONSTANTS_STATUS.HEROES_BOUGHT, 200));
 
     } catch (error) {
         console.log(error);
@@ -277,10 +183,8 @@ const buyHeroes = async (req, res) =>{
 
 const heroesStartQuest = async (req, res) => {
     try {
-        let user = await db.users.findOne({ where: { email: req.user.email } });
-        let wallet_address = user.wallet_address;
-        let wallet_private_key = user.wallet_private_key;
-        const data = await HeroesService.getHeroesByOwner(wallet_address);
+        const user = await fetchUserByEmail(req.user.email);
+        const data = await HeroesService.getHeroesByOwner(user.wallet_address);
         if (!data.heroes || data.heroes.length === 0) {
             return res.status(404).send(Response.sendResponse(false, [], HEROES_CONSTANTS_STATUS.HEROES_NOT_FOUND, 404));
         }
@@ -300,12 +204,10 @@ const heroesStartQuest = async (req, res) => {
         let heroIds = Array.isArray(hero_id) ? hero_id : [hero_id];
 
         const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
-        const wallet = new ethers.Wallet(wallet_private_key, provider);
+        const wallet = new ethers.Wallet(user.wallet_private_key, provider);
         const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
         let heroes_quest = await contract.getHeroQuest(hero_id);
-        console.log("heroes_quest",heroes_quest);
         let questStatus = Number(heroes_quest[9]);
-        console.log("questStatus",questStatus);
 
         const QuestStatus = {
             NONE: 0,
@@ -323,7 +225,7 @@ const heroesStartQuest = async (req, res) => {
         const level = 0;
         const questTypeId = 0;
         const questInstanceId = 1; 
-        console.log(`🚀 Starting Quest for heroes: ${heroIds}`);
+
         const tx = await contract.startQuest(heroIds, questInstanceId, attempts, level, questTypeId )
         const receipt = await tx.wait();
         console.log("Transaction confirmed in block:", receipt.blockNumber);
@@ -342,20 +244,16 @@ const heroesStartQuest = async (req, res) => {
             quest_instance_id: heroes_quest_new[8].toString(),
             hero_address: heroes_quest_new[5]
         };
-        
+        // update hero telegram
         await db.hero_quests.create(questData);
-        let chatId = await db.users.findOne({
-            where: { email: req.user.email },
-            attributes: { include: ["telegram_username"] },
-          });
-        
+
         await axios.post(process.env.TELEGRAM_API_URL, {
-            chat_id: chatId.dataValues.telegram_chatid,
+            chat_id: user.telegram_chatid,
             text: "Hero is been started on Quest please login and check your Defi kingdom portal for more info",
         });
         return res.status(200).send(Response.sendResponse(true, receipt, "Quest started successfully", 200));
     } catch (error) {
-        console.error("❌ Error starting quest:", error);
+        // console.error("Error starting quest:", error);
         return res.status(500).send(Response.sendResponse(false, null, HEROES_CONSTANTS_STATUS.ERROR_OCCURED, 500));
     }
 };
@@ -393,43 +291,74 @@ const startCronJob = async () => {
     }
 };
 
-startCronJob();
+// startCronJob();
 
 
 const heroesCompleteQuest = async (hero_id,wallet_address) => {
     try {
-        let user = await db.users.findOne({ where: { wallet_address: wallet_address } });
-        let wallet_private_key = user.wallet_private_key;
-
+        const user = await fetchUserByWalletAddress(wallet_address);
         const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
-        const wallet = new ethers.Wallet(wallet_private_key, provider);
+        const wallet = new ethers.Wallet(user.wallet_private_key, provider);
         const contract = new ethers.Contract(QUEST_CORE_CONTRACT_ADDRESS, QUEST_ABI, wallet);
 
-        console.log(`🏆 Completing Quest for hero: ${hero_id}`);
+        console.log(`Completing Quest for hero: ${hero_id}`);
         const tx = await contract.completeQuest(hero_id);
         const receipt = await tx.wait();
-        console.log("✅ Quest completed in block:", receipt.blockNumber);
+        console.log("Quest completed in block:", receipt.blockNumber);
         await db.hero_quests.update({ quest_status: 3 }, { where: { hero_id: hero_id } });
 
         await axios.post(process.env.TELEGRAM_API_URL, {
-            chat_id: chatId.dataValues.telegram_chatid,
+            chat_id: user.telegram_chatid,
             text: "Hero Quest is been Completed, Please login to Defi Kingdom portal for more Info",
         });
         return true
 
     } catch (error) {
-        console.error("❌ Error completing quest:", error);
+        console.error("Error completing quest:", error);
         return false;
     }
 };
 
+const sellheroesQuest = async (req, res) => {
+    try {
+        const { hero_id, startingPrice, endingPrice, duration } = req.body;
+    
+        if (!hero_id || !startingPrice || !endingPrice || !duration) {
+            return res.status(500).send(Response.sendResponse(false, null, "Missing required parameters", 400));
+        }
+
+        const user = await fetchUserByEmail(req.user.email);
+
+        const CONTRACT_ADDRESS = "0xc390fAA4C7f66E4D62E59C231D5beD32Ff77BEf0";
+        const ABI = [
+            "function createAuction(uint256 _tokenId, uint128 _startingPrice, uint128 _endingPrice, uint64 _duration, address _winner)"
+        ];
+
+        const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
+        const wallet = new ethers.Wallet(user.wallet_private_key, provider);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+
+        const startingPriceBN = ethers.parseUnits(startingPrice.toString(), 18); 
+        const endingPriceBN = ethers.parseUnits(endingPrice.toString(), 18); 
+        const durationBN = BigInt(duration); 
+        const tx = await contract.createAuction(hero_id,startingPriceBN,endingPriceBN,durationBN,ethers.ZeroAddress );
+
+        console.log("Transaction sent:", tx);
+
+        const receipt = await tx.wait();
+
+        return res.status(200).send({success: true,data: receipt,message: "Hero listed for auction successfully"});
+    } catch (error) {
+        console.error("Error in sellHero API:", error);
+        return res.status(500).send({success: false,message: "An error occurred while listing the hero for auction",error: error.message});
+    }
+};
+
 module.exports = {
-    getOwnerHeroesByAddress, 
-    getHeroesNetworkById, 
-    getHeroesByRarity,
-    getHeroesByStatus, 
+    getOwnerHeroesByAddress,
     heroesStamina ,
     buyHeroes,
     heroesStartQuest ,
-    heroesCompleteQuest
+    heroesCompleteQuest,
+    sellheroesQuest,
 };

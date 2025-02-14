@@ -167,12 +167,14 @@ const aiAgentAction = async (req, res) => {
         action = action?.toLowerCase();
 
         switch (action) {
-            case "swap-tokens":
+            case "swap":
                 return swapTokens(req, res);
-            case "buy_heroes":
+            case "buy_hero":
                 return heroesController.buyHeroes(req, res);
             case "start_quest":
                 return heroesController.heroesStartQuest(req, res);
+            case "sell_hero":
+                    return heroesController.sellheroesQuest(req, res);
             default:
                 return res.status(400).send(Response.sendResponse(false, null, "Invalid action", 400));
         }
@@ -288,9 +290,9 @@ async function swapTokens(req, res) {
                 swap_data = await tokenToNative(amount, wallet, path, CRYSTAL);
 
                 if (swap_data.status) {
-                    return res.status(200).send(Response.sendResponse(true, null, swap_data.message, 200));
+                    return res.status(200).send(Response.sendResponse(true, swap_data.message, swap_data.message, 200));
                 } else {
-                    return res.status(400).send(Response.sendResponse(false, null, swap_data.message, 400));
+                    return res.status(400).send(Response.sendResponse(false, swap_data.message, swap_data.message, 400));
                 }
 
                 break;
@@ -299,7 +301,6 @@ async function swapTokens(req, res) {
                 return res.status(400).send(Response.sendResponse(false, null, "Invalid from and to token", 400));
         }
     } catch (error) {
-        console.log("errr", error)
         return res.status(500).send(Response.sendResponse(false, null, error, 500));
     }
 }
@@ -339,6 +340,5 @@ const withdrawFunds = async (req, res) => {
 
 module.exports = {
     aiAgentAction,
-    withdrawFunds,
     withdrawFunds
 }

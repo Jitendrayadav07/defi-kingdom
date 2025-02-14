@@ -10,7 +10,7 @@ const sendEmail = async (subject, email ,otp ) => {
     try {
       const htmlToSend = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-          <h2 style="color: #4CAF50; text-align: center;">Pharmaalabs - OTP Verification</h2>
+          <h2 style="color: #4CAF50; text-align: center;">DFK AI - OTP Verification</h2>
           <p>Hi ${email},</p>
           <p>You're one step away from securing your account.</p>
           <p>Your One-Time Password (OTP) for verification is:</p>

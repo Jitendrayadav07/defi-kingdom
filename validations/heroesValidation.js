@@ -9,14 +9,6 @@ const heroesValidationSchema = {
         id: Joi.string().required()
     }),
 
-    getHeroesByRaritySchema: Joi.object().keys({
-        rarity: Joi.number().required()
-    }),
-
-    getHeroesByStatusSchema: Joi.object().keys({
-        owner: Joi.string().required(),
-        pjStatus: Joi.string().required()
-    }),
     buyHeroesSchema: Joi.object().keys({
         hero_id: Joi.number().required()
     })
