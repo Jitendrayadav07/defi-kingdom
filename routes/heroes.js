@@ -21,4 +21,10 @@ router.post("/heroes-completed-quest",
     heroesController.heroesCompleteQuest
 );
 
+router.post("/sell-hero", 
+    userAuth,
+    JoiMiddleWare(heroesValidationSchema.sellheroesQuestSchema,"body"),
+    heroesController.sellheroesQuest
+);
+
 module.exports = router; 

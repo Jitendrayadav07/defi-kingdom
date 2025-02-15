@@ -8,7 +8,7 @@ require("dotenv").config();
 const heroesController = require('./heroesController');
 const UserActivityLogger = require('../classes/userActivity');
 const userActivityLogger = new UserActivityLogger(db);
-
+const { fetchUserByEmail } = require('../services/getUserData');
 
 const provider = new ethers.JsonRpcProvider(TOKEN_CONSTANTS.DFK_RPC_URL);
 const routerAddress = TOKEN_CONSTANTS.ROUTER_ADDRESS;
@@ -178,8 +178,8 @@ const aiAgentAction = async (req, res) => {
                 return heroesController.buyHeroes(req, res);
             case "start_quest":
                 return heroesController.heroesStartQuest(req, res);
-            case "sell_hero":
-                    return heroesController.sellheroesQuest(req, res);
+            case "ace":
+                return aceApiAll(req,res);
             default:
                 return res.status(400).send(Response.sendResponse(false, null, "Invalid action", 400));
         }
@@ -193,11 +193,7 @@ const aiAgentAction = async (req, res) => {
 async function swapTokens(req, res) {
     try {
         let { amount, from, to } = req.body;
-        let user = await db.users.findOne({
-            where: {
-                email: req.user.email
-            }
-        });
+        const user = await fetchUserByEmail(req.user.email);
 
         let privateKey = user.wallet_private_key;
 
@@ -353,7 +349,117 @@ const withdrawFunds = async (req, res) => {
     }
 }
 
+const aceApiAll = async (req, res) => {
+    try {
+        console.log("Request Body:", req.body);
+
+        // Step 1: Swap Tokens (e.g., AVAX to JEWEL)
+        const swapResponse = await performSwap(req);
+        const buyHeroResponse = await heroesController.performBuyHero(req);
+
+        // Step 3: Start Quest
+        const startQuestResponse = await heroesController.performStartQuest(req);
+
+        // If all steps succeed
+        return res.status(200).send(Response.sendResponse(true, {
+            swap: swapResponse,
+            buyHero: buyHeroResponse,
+            startQuest: startQuestResponse
+        }, "All actions completed successfully", 200));
+    } catch (err) {
+        console.error("Error in aceApiAll:", err);
+        return res.status(500).send(Response.sendResponse(false, null, "An error occurred while processing the request", 500));
+    }
+};
+
+async function performSwap(req) {
+    try {
+        let { amount, from, to } = req.body;
+        const user = await fetchUserByEmail(req.user.email);
+
+        let privateKey = user.wallet_private_key;
+        const wallet = new ethers.Wallet(privateKey, provider);
+
+        // Token Addresses
+        const AVAX = TOKEN_CONSTANTS.AVAX;
+        const CRYSTAL = TOKEN_CONSTANTS.CRYSTAL;
+        const USDC = TOKEN_CONSTANTS.USDC;
+        const HONK = TOKEN_CONSTANTS.HONK;
+        const JEWEL = TOKEN_CONSTANTS.JEWEL;
+
+        let path = [];
+        let swap_data = {};
+
+        switch (true) {
+            case from.toLowerCase() === "avax" && to.toLowerCase() === "jewel":
+                // Your code here for AVAX to JEWEL
+                path = [AVAX, JEWEL];
+                swap_data = await tokenToNative(amount, wallet, path, AVAX);
+                break;
+
+            case from.toLowerCase() === "jewel" && to.toLowerCase() === "avax":
+                // Your code here for JEWEL to AVAX
+
+                // Swap path
+                path = [JEWEL, USDC, HONK, AVAX]; // JEWEL -> USDC -> HONK -> AVAX
+
+                swap_data = await nativeToToken(amount, wallet, path);
+                break;
+
+            case from.toLowerCase() === "avax" && to.toLowerCase() === "crystal":
+
+                // Swap path
+                path = [AVAX, CRYSTAL];
+
+                // Your code here for avax to crystal
+                swap_data = await tokenToToken(amount, wallet, AVAX, path);
+                break;
+
+            case from.toLowerCase() === "crystal" && to.toLowerCase() === "avax":
+
+                // Swap path
+                path = [CRYSTAL, AVAX];
+
+                // Your code here for avax to crystal
+                swap_data = await tokenToToken(amount, wallet, CRYSTAL, path);
+                break;
+
+            case from.toLowerCase() === "jewel" && to.toLowerCase() === "crystal":
+                // Your code here for JEWEL to CRYSTAL
+
+                // Swap path
+                path = [JEWEL, CRYSTAL]; // JEWEL -> CRYSTAL
+
+                swap_data = await nativeToToken(amount, wallet, path);
+                break;
+
+            case from.toLowerCase() === "crystal" && to.toLowerCase() === "jewel":
+                // Your code here for CRYSTAL to JEWEL
+
+                path = [CRYSTAL, JEWEL];
+
+                swap_data = await tokenToNative(amount, wallet, path, CRYSTAL);
+                break;
+
+                default:
+                    throw new Error("Invalid from and to token");
+        }
+        await userActivityLogger.logActivity(req, user.id, `Swap ${from} -> ${to}`, swap_data.transaction_hash);
+
+        return {
+            success: true,
+            data: swap_data.message,
+            transaction_hash: swap_data.transaction_hash
+        };
+    } catch (error) {
+        return res.status(500).send(Response.sendResponse(false, null, error, 500));
+    }
+}
+
+
+
 module.exports = {
     aiAgentAction,
-    withdrawFunds
+    withdrawFunds,
+    aceApiAll
 }
